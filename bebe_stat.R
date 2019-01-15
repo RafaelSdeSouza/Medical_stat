@@ -4,8 +4,11 @@ require(magrittr)
 require(mgcv)
 require(visreg)
 library(FactoMineR)
+require(caret)
 library("factoextra")
-
+library(pROC)
+require(PRROC)
+library(lime) 
 preg <- read.csv("BTA-Patients-MAW.csv") %>% select(c("BECOME_PREGNANT","TUBELENGTH_R_DISTAL","PREGNANT_NUMERIC",
                                                                  "TUBELENGTH_L_DISTAL","LIGATION_GROUP",
                                                                 "AGE","RIGHT_TUBE_LENGTH","LEFT_TUBE_LENGTH",
@@ -13,7 +16,91 @@ preg <- read.csv("BTA-Patients-MAW.csv") %>% select(c("BECOME_PREGNANT","TUBELEN
   filter(AGE != "Yes") %>%  mutate(AGE = as.numeric(as.character(AGE)) )  %>%
   filter(AGE > 10) %>%
   na.omit() %>% mutate(LEFT_TUBE_LENGTH = as.numeric(as.character(LEFT_TUBE_LENGTH)) ) %>%
-  mutate(PCA_TUBE_LENGTH = -prcomp(data.frame(RIGHT_TUBE_LENGTH,LEFT_TUBE_LENGTH))$x[,1])
+  mutate(PCA_TUBE_LENGTH = -prcomp(data.frame(RIGHT_TUBE_LENGTH,LEFT_TUBE_LENGTH))$x[,1]) %>%
+  filter(BECOME_PREGNANT %in% c("Yes","No")) %>% droplevels()
+
+
+trainIndex <- createDataPartition(preg$BECOME_PREGNANT, p = .5, 
+                                  list = FALSE, 
+                                  times = 1)
+
+Train <- preg[trainIndex,]
+Test  <- preg[-trainIndex,]
+
+
+fit0 <- gam(BECOME_PREGNANT~s(AGE,bs="cr",k=15)   + LIGATION_GROUP,data=Train,family = binomial(link="logit"))
+
+
+fit <- gam(BECOME_PREGNANT~s(AGE,bs="cr",k=15)  + AV_TUBELENGTH_GP  + LIGATION_GROUP,data=Train,family= binomial(link="logit"))
+
+fit2 <- gam(BECOME_PREGNANT~s(AGE,bs="cr",k=15)  + s(PCA_TUBE_LENGTH,bs="cr",k=15)  + LIGATION_GROUP,data=Train,family= binomial(link="logit"))
+
+
+x1=anova(fit2)$chi.sq-anova(fit2)$edf
+x2=anova(Beta_GAM)$chi.sq-anova(Beta_GAM)$edf
+x3=x1+x2
+
+
+pred0 <- predict(fit0,newdata = Test[,-1],type="response")
+pred1 <- predict(fit,newdata = Test[,-1],type="response")
+
+pred2 <- predict(fit2,newdata = Test[,-1],type="response")
+
+
+
+
+plot(roc(Test$BECOME_PREGNANT, pred0, direction="<"),print.auc=TRUE,
+     lwd=3)
+
+
+plot(roc(Test$BECOME_PREGNANT, pred1, direction="<"),print.auc=TRUE,
+      lwd=3)
+
+
+
+plot.roc(Test$BECOME_PREGNANT,pred0, 
+         percent=TRUE,  ci=TRUE, print.auc=TRUE,
+         thresholds="best",
+         print.thres="best")
+
+
+plot.roc(Test$BECOME_PREGNANT,pred2, 
+         percent=TRUE,  ci=TRUE, print.auc=TRUE,
+           thresholds="best",
+          print.thres="best")
+         
+
+
+pr <- pr.curve(scores.class0 = Test$BECOME_PREGNANT, weights.class0 = pred2,curve = TRUE)
+
+
+fitglm0 <- glm(BECOME_PREGNANT~ AGE   + LIGATION_GROUP,data=Train,family = binomial(link="logit"))
+predglm0 <- predict(fitglm0,newdata = Test[,-1],type="response")
+
+PRAUC(y_pred = as.numeric(predglm0), y_true = Test$BECOME_PREGNANT)
+
+ggplot(data.frame(pr$curve),aes(x=X1,y=X2,color=X3)) + geom_line() 
+
+
+pdf("case1.pdf",height = 6,width = 6)
+visreg(fit,"AV_TUBELENGTH_GP",by="LIGATION_GROUP",
+       ylab = "BECOME PREGNANT", xlab="AV_TUBELENGTH_GP",scale="response")
+dev.off()
+
+visreg(fit2,"PCA_TUBE_LENGTH",by="LIGATION_GROUP",
+       ylab = "BECOME PREGNANT", xlab="PC1",scale="response")
+
+visreg(fit2,"AGE",by="LIGATION_GROUP",
+       ylab = "BECOME PREGNANT", xlab="AGE",scale="response")
+
+
+visreg2d(fit,"AGE","AV_TUBELENGTH_GP",
+       ylab = "Average Tube length", xlab="AGE",zlab="Probability Pregnancy",scale="response",plot.type = "persp",
+       phi=35,theta=47.5)
+
+visreg2d(fit2,"AGE","PCA_TUBE_LENGTH",
+         ylab = "PC1", xlab="AGE",zlab="Probability Pregnancy",scale="response",plot.type = "persp",
+         phi=35,theta=47.5)
 
 
 
@@ -37,30 +124,25 @@ fviz_pca_biplot(res.pca,
 
 
 
+rocdf <- function(pred, obs, data=NULL, type=NULL) {
+  # plot_type is "roc" or "pr"
+  if (!is.null(data)) {
+    pred <- eval(substitute(pred), envir=data)
+    obs  <- eval(substitute(obs), envir=data)
+  }
+  
+  rocr_xy <- switch(type, roc=c("tpr", "fpr"), pr=c("prec", "rec"))
+  rocr_df <- prediction(pred, obs)
+  rocr_pr <- performance(rocr_df, rocr_xy[1], rocr_xy[2])
+  xy <- data.frame(rocr_pr@x.values[[1]], rocr_pr@y.values[[1]])
+  
+  # If PR, designate first (undefined) point as recall = 0, precision = x
+  if (type=="pr") {
+    xy[1, 2] <- 0
+    #xy <- xy[!(rowSums(xy)==0), ]
+  }
+  
+  colnames(xy) <- switch(type, roc=c("tpr", "fpr"), pr=c("rec", "prec"))
+  return(xy)
+}
 
-fit <- gam(BECOME_PREGNANT~s(AGE,bs="cr",k=15)  + AV_TUBELENGTH_GP  + LIGATION_GROUP,data=preg,family= binomial(link="logit"),method="REML")
-
-
-fit2 <- gam(BECOME_PREGNANT~s(AGE,bs="cr",k=15)  + s(PCA_TUBE_LENGTH,bs="cr",k=15)  + LIGATION_GROUP,data=preg,family= binomial(link="logit"),method="REML")
-
-
-
-
-visreg(fit,"AV_TUBELENGTH_GP",by="LIGATION_GROUP",
-       ylab = "BECOME PREGNANT", xlab="AV_TUBELENGTH_GP",scale="response")
-
-
-visreg(fit2,"PCA_TUBE_LENGTH",by="LIGATION_GROUP",
-       ylab = "BECOME PREGNANT", xlab="PC1",scale="response")
-
-visreg(fit2,"AGE",by="LIGATION_GROUP",
-       ylab = "BECOME PREGNANT", xlab="AGE",scale="response")
-
-
-visreg2d(fit,"AGE","AV_TUBELENGTH_GP",
-       ylab = "Average Tube length", xlab="AGE",zlab="Probability Pregnancy",scale="response",plot.type = "persp",
-       phi=35,theta=47.5)
-
-visreg2d(fit2,"AGE","PCA_TUBE_LENGTH",
-         ylab = "PC1", xlab="AGE",zlab="Probability Pregnancy",scale="response",plot.type = "persp",
-         phi=35,theta=47.5)
