@@ -28,10 +28,25 @@ Train <- preg[trainIndex,]
 Test  <- preg[-trainIndex,]
 
 
-fit0 <- gam(BECOME_PREGNANT~s(AGE,bs="cr",k=15)   + LIGATION_GROUP,data=Train,family = binomial(link="logit"))
+# Case 0
+fit0 <- gam(BECOME_PREGNANT~s(AGE,bs="cr",k=10)   + LIGATION_GROUP,data=preg,family = binomial(link="logit"))
 
+pdf("case0.pdf",height = 5,width = 6.5)
+visreg(fit0,"AGE",by="LIGATION_GROUP",
+       ylab = "Pregnancy probability", xlab="Age",scale="response")
+dev.off()
 
-fit <- gam(BECOME_PREGNANT~s(AGE,bs="cr",k=15)  + AV_TUBELENGTH_GP  + LIGATION_GROUP,data=Train,family= binomial(link="logit"))
+# Case 1
+
+fit <- gam(BECOME_PREGNANT~s(AGE,bs="cr",k=10)  + AV_TUBELENGTH_GP  + LIGATION_GROUP,data=preg,family= binomial(link="logit"))
+
+pdf("case1.pdf",height = 5,width = 6.5)
+visreg(fit,"AGE",by="LIGATION_GROUP",
+       ylab = "BECOME PREGNANT", xlab="AGE",scale="response")
+
+visreg(fit,"AV_TUBELENGTH_GP",by="LIGATION_GROUP",
+       ylab = "Pregnancy probability", xlab="Average tube lenght (cm)",scale="response")
+dev.off()
 
 fit2 <- gam(BECOME_PREGNANT~s(AGE,bs="cr",k=15)  + s(PCA_TUBE_LENGTH,bs="cr",k=15)  + LIGATION_GROUP,data=Train,family= binomial(link="logit"))
 
@@ -80,6 +95,9 @@ predglm0 <- predict(fitglm0,newdata = Test[,-1],type="response")
 PRAUC(y_pred = as.numeric(predglm0), y_true = Test$BECOME_PREGNANT)
 
 ggplot(data.frame(pr$curve),aes(x=X1,y=X2,color=X3)) + geom_line() 
+
+
+
 
 
 pdf("case1.pdf",height = 6,width = 6)
