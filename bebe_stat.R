@@ -48,7 +48,7 @@ visreg(fit,"assymetry",by="LIGATION_GROUP",cond = list(AGE = 50),
 pdf("case1_0.pdf",height = 10,width = 12)
 par(mfrow=c(2,2))
 visreg2d(fit,"AGE","assymetry",cond = list(LIGATION_GROUP = c("Clip")),plot.type = "persp",scale="response",
-         zlab = "Pregnancy probability", xlab="AGE",ylab="Assymetry (cm)",main="Clip",
+         zlab = "Pregnancy probability", xlab="AGE",ylab="L/R asymmetry (cm)",main="Clip",
          theta=30,phi=13.5,color="#e41a1c")
 visreg2d(fit,"AGE","assymetry",cond = list(LIGATION_GROUP = c("Coagulation")),plot.type = "persp",scale="response",
          zlab = "Pregnancy probability", xlab="AGE",ylab="Average tube lenght (cm)",main="Coagulation",
