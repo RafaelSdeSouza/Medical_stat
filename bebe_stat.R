@@ -44,7 +44,7 @@ fit <- gam(BECOME_PREGNANT~s(AGE,bs="cr",k=10)  + assymetry  + LIGATION_GROUP,da
 
 pdf("case1_0.pdf",height = 5,width = 6.5)
 visreg(fit,"assymetry",by="LIGATION_GROUP",cond = list(AGE = 25),
-       ylab = "Pregnancy probability", xlab="(L + R)/max(L,R)",scale="response")
+       ylab = "Pregnancy probability", xlab="L + R",scale="response")
 
 pdf("case1_0.pdf",height = 10,width = 12)
 par(mfrow=c(2,2))
