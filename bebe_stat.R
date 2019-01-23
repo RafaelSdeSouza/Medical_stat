@@ -17,7 +17,8 @@ preg <- read.csv("BTA-Patients-MAW.csv") %>% select(c("BECOME_PREGNANT","TUBELEN
   filter(AGE > 10) %>%
   na.omit() %>% mutate(LEFT_TUBE_LENGTH = as.numeric(as.character(LEFT_TUBE_LENGTH)) ) %>%
   mutate(PCA_TUBE_LENGTH = -prcomp(data.frame(RIGHT_TUBE_LENGTH,LEFT_TUBE_LENGTH))$x[,1]) %>%
-  mutate(assymetry = abs((RIGHT_TUBE_LENGTH - LEFT_TUBE_LENGTH)/AV_TUBELENGTH_GP)) %>%
+#  mutate(assymetry = (RIGHT_TUBE_LENGTH + LEFT_TUBE_LENGTH)/apply(data.frame(RIGHT_TUBE_LENGTH,LEFT_TUBE_LENGTH), 1, max)) %>%
+  mutate(assymetry = (RIGHT_TUBE_LENGTH + LEFT_TUBE_LENGTH)) %>%
   filter(BECOME_PREGNANT %in% c("Yes","No")) %>% droplevels()
 
 
@@ -42,8 +43,8 @@ dev.off()
 fit <- gam(BECOME_PREGNANT~s(AGE,bs="cr",k=10)  + assymetry  + LIGATION_GROUP,data=preg,family= binomial(link="logit"))
 
 pdf("case1_0.pdf",height = 5,width = 6.5)
-visreg(fit,"assymetry",by="LIGATION_GROUP",cond = list(AGE = 50),
-       ylab = "Pregnancy probability", xlab="L/R asymmetry",scale="response")
+visreg(fit,"assymetry",by="LIGATION_GROUP",cond = list(AGE = 25),
+       ylab = "Pregnancy probability", xlab="(L + R)/max(L,R)",scale="response")
 
 pdf("case1_0.pdf",height = 10,width = 12)
 par(mfrow=c(2,2))
