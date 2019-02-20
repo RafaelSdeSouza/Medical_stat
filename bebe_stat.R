@@ -22,6 +22,38 @@ preg <- read.csv("BTA-Patients-MAW.csv") %>% select(c("BECOME_PREGNANT","TUBELEN
   filter(BECOME_PREGNANT %in% c("Yes","No")) %>% droplevels()
 
 
+tubesum <- preg %>%  select(c("LIGATION_GROUP","TUBELENGTH_R_DISTAL",
+                         "TUBELENGTH_L_DISTAL",
+                         "RIGHT_TUBE_LENGTH","LEFT_TUBE_LENGTH",
+                         "TUBELENGTH_R_PROX","TUBELENGTH_L_PROX")) %>% 
+                           melt(.,id.vars="LIGATION_GROUP") %>%
+                           mutate(value=as.numeric(value))
+
+
+
+ggplot(tubesum,aes(x=variable,y=value,group=variable,
+                   fill=variable)) +
+  geom_boxplot(outlier.shape = NA) +
+  facet_wrap(.~LIGATION_GROUP,scales = "free") +
+  theme(plot.background = element_rect(fill = "white"),
+        panel.background = element_rect(fill = "white",
+                                        colour = "white",
+                                        size = 0.5, linetype = "solid"),
+        text=element_text(family="serif"),
+        strip.text = element_text(size=22),
+        strip.background = element_rect(fill = "white"),
+        axis.title = element_text(size=25),
+        axis.text  = element_text(size=20),
+        axis.ticks = element_line(size = 0.45),
+        axis.text.x = element_text(hjust = 1),
+        legend.position = "none",
+        legend.background = element_rect(colour = "white", fill = "white"),
+        legend.text = element_text(size=25),
+        legend.text.align = 0,
+        legend.key = element_rect(colour = "white", fill = "white")) +
+  guides(size = guide_legend(override.aes = list(size = 4)))
+
+
 trainIndex <- createDataPartition(preg$BECOME_PREGNANT, p = .5, 
                                   list = FALSE, 
                                   times = 1)
