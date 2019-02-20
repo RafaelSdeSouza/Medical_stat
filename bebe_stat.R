@@ -10,22 +10,34 @@ library(pROC)
 require(PRROC)
 library(lime) 
 preg <- read.csv("BTA-Patients-MAW.csv") %>% select(c("BECOME_PREGNANT","TUBELENGTH_R_DISTAL","PREGNANT_NUMERIC",
-                                                                 "TUBELENGTH_L_DISTAL","LIGATION_GROUP",
+                                                                "TUBELENGTH_L_DISTAL","LIGATION_GROUP",
                                                                 "AGE","RIGHT_TUBE_LENGTH","LEFT_TUBE_LENGTH",
-                                                                "TUBELENGTH_R_PROX","TUBELENGTH_L_PROX","AV_TUBELENGTH_GP")) %>%
+                                                                "TUBELENGTH_R_PROX",
+                                                                "TUBELENGTH_L_PROX","AV_TUBELENGTH_GP",
+                                                                "R_DIAMETER_NUMERIC",
+                                                                "L_DIAMETER_NUMERIC",
+                                                                "R_FIBROSIS_NUMERIC",
+                                                                "L_FIBROSIS_NUMERIC")) %>%
   filter(AGE != "Yes") %>%  mutate(AGE = as.numeric(as.character(AGE)) )  %>%
   filter(AGE > 10) %>%
   na.omit() %>% mutate(LEFT_TUBE_LENGTH = as.numeric(as.character(LEFT_TUBE_LENGTH)) ) %>%
   mutate(PCA_TUBE_LENGTH = -prcomp(data.frame(RIGHT_TUBE_LENGTH,LEFT_TUBE_LENGTH))$x[,1]) %>%
 #  mutate(assymetry = (RIGHT_TUBE_LENGTH + LEFT_TUBE_LENGTH)/apply(data.frame(RIGHT_TUBE_LENGTH,LEFT_TUBE_LENGTH), 1, max)) %>%
-  mutate(assymetry = (RIGHT_TUBE_LENGTH + LEFT_TUBE_LENGTH)) %>%
+  mutate(TL = (RIGHT_TUBE_LENGTH + LEFT_TUBE_LENGTH)) %>%
+  mutate(DL = (R_DIAMETER_NUMERIC + R_FIBROSIS_NUMERIC)) %>%
+  mutate(FL = (L_FIBROSIS_NUMERIC + LEFT_TUBE_LENGTH)) %>%
   filter(BECOME_PREGNANT %in% c("Yes","No")) %>% droplevels()
 
 
 tubesum <- preg %>%  select(c("LIGATION_GROUP","TUBELENGTH_R_DISTAL",
                          "TUBELENGTH_L_DISTAL",
                          "RIGHT_TUBE_LENGTH","LEFT_TUBE_LENGTH",
-                         "TUBELENGTH_R_PROX","TUBELENGTH_L_PROX")) %>% 
+                         "TUBELENGTH_R_PROX","TUBELENGTH_L_PROX",
+                         "R_DIAMETER_NUMERIC",
+                         "L_DIAMETER_NUMERIC",
+                         "R_FIBROSIS_NUMERIC",
+                         "L_FIBROSIS_NUMERIC"
+                           )) %>% 
                            melt(.,id.vars="LIGATION_GROUP") %>%
                            mutate(value=as.numeric(value))
 
@@ -34,24 +46,24 @@ tubesum <- preg %>%  select(c("LIGATION_GROUP","TUBELENGTH_R_DISTAL",
 ggplot(tubesum,aes(x=variable,y=value,group=variable,
                    fill=variable)) +
   geom_boxplot(outlier.shape = NA) +
-  facet_wrap(.~LIGATION_GROUP,scales = "free") +
+  facet_wrap(.~LIGATION_GROUP) +
+  ylab("Lenght") + xlab("") +
   theme(plot.background = element_rect(fill = "white"),
         panel.background = element_rect(fill = "white",
                                         colour = "white",
                                         size = 0.5, linetype = "solid"),
         text=element_text(family="serif"),
-        strip.text = element_text(size=22),
+        strip.text = element_text(size=10),
         strip.background = element_rect(fill = "white"),
-        axis.title = element_text(size=25),
-        axis.text  = element_text(size=20),
+        axis.title = element_text(size=10),
+        axis.text  = element_text(size=7),
         axis.ticks = element_line(size = 0.45),
-        axis.text.x = element_text(hjust = 1),
+        axis.text.x = element_text(angle = 60,hjust = 1),
         legend.position = "none",
         legend.background = element_rect(colour = "white", fill = "white"),
         legend.text = element_text(size=25),
         legend.text.align = 0,
-        legend.key = element_rect(colour = "white", fill = "white")) +
-  guides(size = guide_legend(override.aes = list(size = 4)))
+        legend.key = element_rect(colour = "white", fill = "white")) 
 
 
 trainIndex <- createDataPartition(preg$BECOME_PREGNANT, p = .5, 
@@ -72,7 +84,7 @@ dev.off()
 
 # Case 1
 
-fit <- gam(BECOME_PREGNANT~s(AGE,bs="cr",k=10)  + assymetry  + LIGATION_GROUP,data=preg,family= binomial(link="logit"))
+fit <- gam(BECOME_PREGNANT~s(AGE,bs="cr",k=10)  + TL + DL + FL  + LIGATION_GROUP,data=preg,family= binomial(link="logit"))
 
 pdf("case1_0.pdf",height = 5,width = 6.5)
 visreg(fit,"assymetry",by="LIGATION_GROUP",cond = list(AGE = 25),
