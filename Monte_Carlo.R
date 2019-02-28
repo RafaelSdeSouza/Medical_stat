@@ -10,24 +10,46 @@ library(pROC)
 require(PRROC)
 library(lime) 
 require(reshape)
-preg <- read.csv("BTA-Patients-MAW.csv") %>% select(c("BECOME_PREGNANT","TUBELENGTH_R_DISTAL","PREGNANT_NUMERIC",
-                                                                "TUBELENGTH_L_DISTAL","LIGATION_GROUP",
-                                                                "AGE","RIGHT_TUBE_LENGTH","LEFT_TUBE_LENGTH",
-                                                                "TUBELENGTH_R_PROX",
-                                                                "TUBELENGTH_L_PROX","AV_TUBELENGTH_GP",
-                                                                "R_DIAMETER_NUMERIC",
-                                                                "L_DIAMETER_NUMERIC",
-                                                                "R_FIBROSIS_NUMERIC",
-                                                                "L_FIBROSIS_NUMERIC")) %>%
-  filter(AGE != "Yes") %>%  mutate(AGE = as.numeric(as.character(AGE)) )  %>%
-  filter(AGE > 10) %>%
-  na.omit() %>% mutate(LEFT_TUBE_LENGTH = as.numeric(as.character(LEFT_TUBE_LENGTH)) ) %>%
-  mutate(PCA_TUBE_LENGTH = -prcomp(data.frame(RIGHT_TUBE_LENGTH,LEFT_TUBE_LENGTH))$x[,1]) %>%
-#  mutate(assymetry = (RIGHT_TUBE_LENGTH + LEFT_TUBE_LENGTH)/apply(data.frame(RIGHT_TUBE_LENGTH,LEFT_TUBE_LENGTH), 1, max)) %>%
-  mutate(TL = (RIGHT_TUBE_LENGTH + LEFT_TUBE_LENGTH)) %>%
-  mutate(DL = (R_DIAMETER_NUMERIC + R_FIBROSIS_NUMERIC)) %>%
-  mutate(FL = (L_FIBROSIS_NUMERIC + LEFT_TUBE_LENGTH)) %>%
-  filter(BECOME_PREGNANT %in% c("Yes","No")) %>% droplevels()
+require(corrplot)
+
+# Auxiliar function to randomly select a given column 
+
+
+
+crand <- function(x,seed){
+  if (!missing(seed)) 
+    set.seed(seed) 
+  xr <- x[1+rbinom(1,1,0.5)]
+  return(xr)
+}
+
+
+preg <- read.csv("BTA-Patients-MAW.csv") %>% select(c("BECOME_PREGNANT",  "AGE",    
+                                                      "PREGNANT_NUMERIC",     "LIGATION_GROUP", 
+                                                      "TUBELENGTH_L_DISTAL",  "TUBELENGTH_R_DISTAL", 
+                                                      "LEFT_TUBE_LENGTH",     "RIGHT_TUBE_LENGTH",
+                                                      "TUBELENGTH_L_PROX",    "TUBELENGTH_R_PROX",        
+                                                      "L_DIAMETER_NUMERIC",   "R_DIAMETER_NUMERIC", 
+                                                      "L_FIBROSIS_NUMERIC",   "R_FIBROSIS_NUMERIC",
+                                                      "ANASTOMOSIS2_NUMERIC","ANASTOMOSIS1_NUMERIC"
+                                                      )) %>%
+   filter(AGE != "Yes") %>%  mutate(AGE = as.numeric(as.character(AGE)) )  %>%
+   filter(AGE > 10) %>%
+   na.omit() %>% mutate(LEFT_TUBE_LENGTH = as.numeric(as.character(LEFT_TUBE_LENGTH)) ) %>%
+   filter(BECOME_PREGNANT %in% c("Yes","No")) %>% droplevels()  %>%
+   mutate(TL_rand = apply(preg[,c("LEFT_TUBE_LENGTH","RIGHT_TUBE_LENGTH")],1,crand,seed=42)) %>%
+   mutate(TLD_rand = apply(preg[,c( "TUBELENGTH_L_DISTAL",  "TUBELENGTH_R_DISTAL")],1,crand,seed=42)) %>%
+   mutate(TLP_rand = apply(preg[,c("TUBELENGTH_L_PROX", "TUBELENGTH_R_PROX")],1,crand,seed=42)) %>%
+   mutate(ANAS_rand = apply(preg[,c("ANASTOMOSIS2_NUMERIC","ANASTOMOSIS1_NUMERIC")],1,crand,seed=42)) %>%
+   mutate(Fibr_rand = apply(preg[,c("L_FIBROSIS_NUMERIC", "R_FIBROSIS_NUMERIC")],1,crand,seed=42)) 
+
+
+
+
+M <- preg[,c("TL_rand",)]
+
+corrplot(M, type = "upper", order = "hclust",
+         col = brewer.pal(n = 8, name = "PuOr"))
 
 
 tubesum <- preg %>%  select(c("LIGATION_GROUP","TUBELENGTH_R_DISTAL",
@@ -41,12 +63,6 @@ tubesum <- preg %>%  select(c("LIGATION_GROUP","TUBELENGTH_R_DISTAL",
                            )) %>% 
                            melt(.,id.vars="LIGATION_GROUP") %>%
                            mutate(value=as.numeric(value))
-
-TUBE_LENGTH <- data.frame(preg$LEFT_TUBE_LENGTH,preg$RIGHT_TUBE_LENGTH)
-TL <- c()
-for(i in 1:5){
-TL <- append(TL,TUBE_LENGTH[i,1+rbinom(1,1,0.5)])
-}
 
 
 
