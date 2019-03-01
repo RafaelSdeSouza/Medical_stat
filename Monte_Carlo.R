@@ -36,20 +36,51 @@ preg <- read.csv("BTA-Patients-MAW.csv") %>% select(c("BECOME_PREGNANT",  "AGE",
    filter(AGE != "Yes") %>%  mutate(AGE = as.numeric(as.character(AGE)) )  %>%
    filter(AGE > 10) %>%
    na.omit() %>% mutate(LEFT_TUBE_LENGTH = as.numeric(as.character(LEFT_TUBE_LENGTH)) ) %>%
-   filter(BECOME_PREGNANT %in% c("Yes","No")) %>% droplevels()  %>%
-   mutate(TL_rand = apply(preg[,c("LEFT_TUBE_LENGTH","RIGHT_TUBE_LENGTH")],1,crand,seed=42)) %>%
-   mutate(TLD_rand = apply(preg[,c( "TUBELENGTH_L_DISTAL",  "TUBELENGTH_R_DISTAL")],1,crand,seed=42)) %>%
-   mutate(TLP_rand = apply(preg[,c("TUBELENGTH_L_PROX", "TUBELENGTH_R_PROX")],1,crand,seed=42)) %>%
-   mutate(ANAS_rand = apply(preg[,c("ANASTOMOSIS2_NUMERIC","ANASTOMOSIS1_NUMERIC")],1,crand,seed=42)) %>%
-   mutate(Fibr_rand = apply(preg[,c("L_FIBROSIS_NUMERIC", "R_FIBROSIS_NUMERIC")],1,crand,seed=42)) 
+   mutate(TUBELENGTH_L_DISTAL = as.numeric(as.character(TUBELENGTH_L_DISTAL)) ) %>%
+   filter(BECOME_PREGNANT %in% c("Yes","No")) %>% droplevels()  
+
+
+rlist <- rbinom(nrow(preg),1,0.5) + 1
+
+temp1 <- preg[,c("LEFT_TUBE_LENGTH","RIGHT_TUBE_LENGTH")]
+temp2 <- preg[,c( "TUBELENGTH_L_DISTAL",  "TUBELENGTH_R_DISTAL")]
+temp3 <- preg[,c("TUBELENGTH_L_PROX", "TUBELENGTH_R_PROX")]
+temp4 <- preg[,c("ANASTOMOSIS2_NUMERIC","ANASTOMOSIS1_NUMERIC")]
+temp5 <- preg[,c("L_FIBROSIS_NUMERIC","R_FIBROSIS_NUMERIC")]
+
+
+
+TL_rand <- c()
+TLD_rand <- c()
+TLP_rand <- c()
+ANAS_rand <- c()
+Fibr_rand <- c()
+for (i in 1:nrow(preg)) {
+TL_rand <-  append(TL_rand,temp1[i,rlist[i]])
+TLD_rand <- append(TLD_rand,temp2[i,rlist[i]])
+TLP_rand <- append(TLP_rand,temp3[i,rlist[i]])
+ANAS_rand <- append(ANAS_rand,temp4[i,rlist[i]])
+Fibr_rand <- append(Fibr_rand,temp5[i,rlist[i]])
+}
+
+preg2 <- preg %>%
+  mutate(TL_rand = TL_rand) %>%
+  mutate(TLD_rand = TLD_rand) %>%
+  mutate(TLP_rand = TLP_rand) %>%
+  mutate(ANAS_rand = ANAS_rand) %>%
+  mutate(Fibr_rand = Fibr_rand) 
+
+
+
+  
+  
 
 
 
 
-M <- preg[,c("TL_rand",)]
+M <- preg2[,c("TL_rand","TLD_rand","TLP_rand","ANAS_rand","Fibr_rand")]
 
-corrplot(M, type = "upper", order = "hclust",
-         col = brewer.pal(n = 8, name = "PuOr"))
+corrplot(cor(M),method="number",type="lower")
 
 
 tubesum <- preg %>%  select(c("LIGATION_GROUP","TUBELENGTH_R_DISTAL",
