@@ -3,14 +3,18 @@ require(dplyr)
 require(magrittr)
 require(mgcv)
 require(visreg)
-library(FactoMineR)
 require(caret)
-library("factoextra")
 library(pROC)
-require(PRROC)
 library(lime) 
 require(reshape)
 require(corrplot)
+require(randomForest)
+library(lime)       # ML local interpretation
+library(vip)        # ML global interpretation
+library(pdp)        # ML global interpretation
+library(ggplot2)    # visualization pkg leveraged by above packages
+library(caret)      # ML model building
+library(h2o)        # ML model building
 
 # Auxiliar function to randomly select a given column 
 
@@ -23,9 +27,9 @@ crand <- function(x,seed){
   return(xr)
 }
 
-
+#"PREGNANT_NUMERIC", 
 preg <- read.csv("BTA-Patients-MAW.csv") %>% select(c("BECOME_PREGNANT",  "AGE",    
-                                                      "PREGNANT_NUMERIC",     "LIGATION_GROUP", 
+                                                        "LIGATION_GROUP", 
                                                       "TUBELENGTH_L_DISTAL",  "TUBELENGTH_R_DISTAL", 
                                                       "LEFT_TUBE_LENGTH",     "RIGHT_TUBE_LENGTH",
                                                       "TUBELENGTH_L_PROX",    "TUBELENGTH_R_PROX",        
@@ -78,15 +82,58 @@ preg2 <- preg %>%
 
 
 
+
+
+
 M <- preg2[,c("TL_rand","TLD_rand","TLP_rand","ANAS_rand","Fibr_rand")]
 
 corrplot(cor(M),method="number",type="lower")
 
 
+trainIndex <- createDataPartition(preg$BECOME_PREGNANT, p = .5, 
+                                  list = FALSE, 
+                                  times = 1)
+Train <- preg2[trainIndex,]
+Test  <- preg2[-trainIndex,]
 
-Train <- preg[trainIndex,]
-Test  <- preg[-trainIndex,]
 
+
+fit.caret <- train(
+  BECOME_PREGNANT~AGE+TL_rand + TLD_rand + TLP_rand  + ANAS_rand + Fibr_rand, 
+  data = Train, 
+  method = 'ranger',
+  trControl = trainControl(method = "cv", number = 5, classProbs = TRUE),
+  tuneLength = 1,
+  importance = 'impurity'
+)
+
+vip(fit.caret) + ggtitle("ranger: RF")
+
+
+
+global_obs <- Train %>% select(c( "AGE",
+                                  "TL_rand","TLD_rand","TLP_rand","ANAS_rand","Fibr_rand"
+)) 
+explainer_caret <- lime(global_obs, fit.caret, n_bins = 5)
+
+class(explainer_caret)
+
+local_obs <- Train %>% select(c( "AGE",
+                                 "TL_rand","TLD_rand","TLP_rand","ANAS_rand","Fibr_rand"
+))  %>%  filter(AGE >= 47)
+
+explanation_caret <- explain(
+  x = local_obs, 
+  explainer = explainer_caret, 
+  n_permutations = 5000,
+  dist_fun = "gower",
+  kernel_width = .75,
+  n_features = 10, 
+  feature_select = "highest_weights",
+  labels = "Yes"
+)
+
+plot_features(explanation_caret)
 
 # Case 1 Age + ligation method
 
@@ -103,6 +150,19 @@ pred0 <- predict(fit0,newdata = Test[,-1],type="response")
 pred1 <- predict(fit,newdata = Test[,-1],type="response")
 
 
+plot(roc(Test$BECOME_PREGNANT, pred0, direction="<"),print.auc=TRUE,
+     lwd=3)
+
+
+plot(roc(Test$BECOME_PREGNANT, pred1, direction="<"),print.auc=TRUE,
+     lwd=3)
+
+
+
+tree_model <- randomForest(BECOME_PREGNANT~AGE+TL_rand + TLD_rand + TLP_rand  + ANAS_rand + Fibr_rand,data=Train,ntree=5000)
+predRF <- predict(tree_model,newdata = Test[,-1],type="prob")
+plot(roc(Test$BECOME_PREGNANT, predRF[,2], direction="<"),print.auc=TRUE,
+     lwd=3)
 
 
 pred2 <- predict(fit2,newdata = Test[,-1],type="response")
