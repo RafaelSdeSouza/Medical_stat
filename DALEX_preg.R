@@ -17,6 +17,7 @@ library(caret)      # ML model building
 library(h2o)        # ML model building
 require(xgboost)
 require(DALEX)
+source("my_style.R")
 # Auxiliar function to randomly select a given column 
 
 
@@ -43,7 +44,7 @@ preg <- read.csv("BTA-Patients-MAW.csv") %>% select(c("PREGNANT_NUMERIC",  "AGE"
    na.omit() %>% mutate(LEFT_TUBE_LENGTH = as.numeric(as.character(LEFT_TUBE_LENGTH)) ) %>%
    mutate(TUBELENGTH_L_DISTAL = as.numeric(as.character(TUBELENGTH_L_DISTAL)) ) %>%
    filter(PREGNANT_NUMERIC %in% c(0,1)) %>% 
-   mutate(PREGNANT_NUMERIC = as.numeric(PREGNANT_NUMERIC))
+   mutate(PREGNANT_NUMERIC = as.numeric(as.character(PREGNANT_NUMERIC))) %>% 
   
   droplevels()  
 
@@ -76,7 +77,8 @@ preg2 <- preg %>%
   mutate(TLD_rand = TLD_rand) %>%
   mutate(TLP_rand = TLP_rand) %>%
   mutate(ANAS_rand = ANAS_rand) %>%
-  mutate(Fibr_rand = Fibr_rand) 
+  mutate(Fibr_rand = Fibr_rand) %>%
+  select(c("PREGNANT_NUMERIC",  "AGE", "TL_rand", "TLD_rand","TLP_rand","ANAS_rand","Fibr_rand"))
 
 
 
@@ -89,7 +91,7 @@ Test  <- preg2[-trainIndex,]
 
 model_matrix_train <- model.matrix(PREGNANT_NUMERIC~AGE+TL_rand + 
                                      TLD_rand + TLP_rand  + 
-                                     ANAS_rand + Fibr_rand,Train)
+                                     ANAS_rand + Fibr_rand-1,Train)
 
 data_train <- xgb.DMatrix(model_matrix_train,
                           label = Train$PREGNANT_NUMERIC)
@@ -97,20 +99,40 @@ data_train <- xgb.DMatrix(model_matrix_train,
 param <- list(max_depth=2,objective="binary:logistic")
 
 HR_xgb_model <- xgb.train(param,data_train,nrounds=50)
+
 HR_glm_model <- glm(PREGNANT_NUMERIC~AGE+TL_rand + 
                       TLD_rand + TLP_rand  + 
-                      ANAS_rand + Fibr_rand,Train)
+                      ANAS_rand + Fibr_rand,Train,family=binomial(link = "logit"))
+
+
+
+
+explainer_glm <- explain(HR_glm_model,Train)
+
+explainer_xgb <- explain(HR_xgb_model,model_matrix_train)
+
+expl_xgb <- variable_response(explainer_xgb,"AGE",
+                              "pdp")
+
+expl_glm <- variable_response(explainer_glm,"AGE",
+                              "pdp")
+
+plot(expl_xgb,expl_glm) + my_style() +
+xlab("Age") +
+  ylab("Pregnancy probability")
+
+
+
+
+
 
 #GLM model
 
-explainer_glm <- explain(HR_glm_model,Train)
-explainer_xgb <- explain(HR_xgb_model,Train)
 
 
-expl_glm <- variable_response(explainer_glm,"BECOME_PREGNANT",
-                              "pdp")
-expl_xgb <- variable_response(explainer_xgb,"BECOME_PREGNANT",
-                              "pdp")
+
+
+
 
   
 
