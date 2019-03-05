@@ -93,8 +93,16 @@ model_matrix_train <- model.matrix(PREGNANT_NUMERIC~AGE+TL_rand +
                                      TLD_rand + TLP_rand  + 
                                      ANAS_rand + Fibr_rand-1,Train)
 
+model_matrix_test <- model.matrix(PREGNANT_NUMERIC~AGE+TL_rand + 
+                                     TLD_rand + TLP_rand  + 
+                                     ANAS_rand + Fibr_rand-1,Test)
+
 data_train <- xgb.DMatrix(model_matrix_train,
                           label = Train$PREGNANT_NUMERIC)
+
+data_test <- xgb.DMatrix(model_matrix_test,
+                         label = Test$PREGNANT_NUMERIC)
+
 
 param <- list(max_depth=2,objective="binary:logistic")
 
@@ -107,18 +115,76 @@ HR_glm_model <- glm(PREGNANT_NUMERIC~AGE+TL_rand +
 
 
 
+
 explainer_glm <- explain(HR_glm_model,Train)
 
-explainer_xgb <- explain(HR_xgb_model,model_matrix_train)
-
-expl_xgb <- variable_response(explainer_xgb,"AGE",
+expl_glm1 <- variable_response(explainer_glm,"AGE",
                               "pdp")
+expl_glm2 <- variable_response(explainer_glm,"TL_rand",
+                               "pdp")
+expl_glm3 <- variable_response(explainer_glm,"TLD_rand",
+                               "pdp")
+expl_glm4 <- variable_response(explainer_glm,"TLP_rand",
+                               "pdp")
+expl_glm5 <- variable_response(explainer_glm,"ANAS_rand",
+                               "pdp")
+expl_glm6 <- variable_response(explainer_glm,"Fibr_rand",
+                               "pdp")
 
-expl_glm <- variable_response(explainer_glm,"AGE",
+expl_glm <- rbind(expl_glm1,expl_glm2,expl_glm3,expl_glm4,expl_glm5,
+                  expl_glm6)
+
+
+explainer_xgb <- explain(HR_xgb_model,model_matrix_train,
+                         y=Train$PREGNANT_NUMERIC,
+                         label="modelxgb")                        
+
+expl_xgb1 <- variable_response(explainer_xgb,"AGE",
                               "pdp")
+expl_xgb2 <- variable_response(explainer_xgb,"TL_rand",
+                              "pdp")
+expl_xgb3 <- variable_response(explainer_xgb,"TLD_rand",
+                              "pdp")
+expl_xgb4 <- variable_response(explainer_xgb,"TLP_rand",
+                              "pdp")
+expl_xgb5 <- variable_response(explainer_xgb,"ANAS_rand",
+                              "pdp")
+expl_xgb6 <- variable_response(explainer_xgb,"Fibr_rand",
+                               "pdp")
 
-plot(expl_xgb,expl_glm) + my_style() +
-xlab("Age") +
+expl_xgb <- rbind(expl_xgb1,expl_xgb2,expl_xgb3,expl_xgb4,expl_xgb5,
+                  expl_xgb6)
+
+expl <- rbind(expl_glm,expl_xgb) %>%
+mutate(var = recode(var, TL_rand = "Tube length",
+                    TLD_rand = "Tube length distal",
+                    TLP_rand = "Tube length prox",
+                    ANAS_rand = "ANASTOMOSIS",
+                    Fibr_rand = "FIBROSIS")) %>%
+  mutate(label = recode(label, lm = "glm",
+                        xgb.Booster = "xgb"))
+
+
+pdf("partial_dep.pdf",height = 7,width = 10)
+ggplot(expl,aes(x=x,y=y,group=label,color=label)) +
+  geom_line() + geom_point() + scale_colour_tableau()+
+  facet_wrap(.~var,scales="free") + my_style() +
+  ylab("Pregnancy probability") + xlab("")
+dev.off()
+
+
+
+vd_xgb <- variable_importance(explainer_xgb,type="difference")
+
+plot(vd_xgb)
+
+nobs <- model_matrix_train[1, , drop = FALSE]
+pred_xgb <- prediction_breakdown(explainer_xgb,observation = nobs)
+plot(pred_xgb )
+
+
+plot(expl_xgb,expl_glm)  +
+xlab("TL_rand") +
   ylab("Pregnancy probability")
 
 
