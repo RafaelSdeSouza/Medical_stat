@@ -119,9 +119,9 @@ plot(mp_classif_gbm, mp_classif_glm,mp_classif_xgb) +  my_style()
 
 
 
-vi_classif_gbm <- variable_importance(explainer_classif_gbm)
-vi_classif_glm <- variable_importance(explainer_classif_glm, loss_function = loss_root_mean_square)
-vi_classif_xgb <- variable_importance(explainer_classif_xgb, loss_function = loss_root_mean_square)
+vi_classif_gbm <- variable_importance(explainer_classif_gbm, loss_function = loss_cross_entropy,type = "difference")
+vi_classif_glm <- variable_importance(explainer_classif_glm, loss_function = loss_root_mean_square,type = "difference")
+vi_classif_xgb <- variable_importance(explainer_classif_xgb, loss_function = loss_root_mean_square,type = "difference")
 
 plot(vi_classif_gbm, vi_classif_glm,vi_classif_xgb)
 
