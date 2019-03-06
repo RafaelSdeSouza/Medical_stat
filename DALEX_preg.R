@@ -74,7 +74,7 @@ preg2 <- preg %>%
 
 
 # Split train vs test sample
-trainIndex <- createDataPartition(preg2$PREGNANT_NUMERIC, p = .9, 
+trainIndex <- createDataPartition(preg2$PREGNANT_NUMERIC, p = .7, 
                                   list = FALSE, 
                                   times = 1)
 Train <- preg2[trainIndex,]
@@ -85,7 +85,7 @@ classif_gbm <- train(PREGNANT_NUMERIC~AGE+LIGATION_GROUP+TL_rand + TLD_rand + TL
 
 classif_glm <- train(PREGNANT_NUMERIC~AGE+LIGATION_GROUP+TL_rand + TLD_rand + TLP_rand  + ANAS_rand + Fibr_rand, data = Train , method="glm", family="binomial")
 
-classif_xgb<- train(PREGNANT_NUMERIC~AGE+LIGATION_GROUP+TL_rand + TLD_rand + TLP_rand  + ANAS_rand + Fibr_rand, data = Train , method="xgbTree")
+classif_xgb <- train(PREGNANT_NUMERIC~AGE+LIGATION_GROUP+TL_rand + TLD_rand + TLP_rand  + ANAS_rand + Fibr_rand, data = Train , method="gam", family=binomial(logit))
 
 
 p_fun <- function(object, newdata){predict(object, newdata=newdata, type="prob")[,2]}
@@ -100,13 +100,10 @@ explainer_classif_glm <- explain(classif_glm, label = "glm",
                                  predict_function = p_fun)
 
 
-explainer_classif_xgb <- explain(classif_xgb, label = "xgb", 
-                                        data = Test, y = yTest,
+explainer_classif_xgb <- explain(classif_xgb, label = "gam", 
+                                        data = Test[,-1], y = yTest,
                                         predict_function = p_fun)
 
-explain(HR_xgb_model,model_matrix_train,
-        y=Train$PREGNANT_NUMERIC,
-        label="modelxgb")   
 
 
 mp_classif_gbm <- model_performance(explainer_classif_gbm)
@@ -116,17 +113,25 @@ mp_classif_glm <- model_performance(explainer_classif_glm)
 plot(mp_classif_gbm, mp_classif_glm,mp_classif_xgb) +  my_style() 
 
 
+`%not_in%` <- purrr::negate(`%in%`)
 
 
+vi_classif_gbm <- variable_importance(explainer_classif_gbm, loss_function = loss_root_mean_square,type = "ratio") %>% 
+  filter(variable %not_in% c("_full_model_","_baseline_"))
 
-vi_classif_gbm <- variable_importance(explainer_classif_gbm, loss_function = loss_cross_entropy,type = "difference")
-vi_classif_glm <- variable_importance(explainer_classif_glm, loss_function = loss_root_mean_square,type = "difference")
-vi_classif_xgb <- variable_importance(explainer_classif_xgb, loss_function = loss_root_mean_square,type = "difference")
+vi_classif_glm <- variable_importance(explainer_classif_glm, loss_function = loss_root_mean_square,type = "ratio")
+
+vi_classif_xgb <- variable_importance(explainer_classif_xgb, loss_function = loss_root_mean_square,type = "ratio")
 
 plot(vi_classif_gbm, vi_classif_glm,vi_classif_xgb)
 
 
-
+ggplot(vi_classif_gbm, aes(x=variable, y=dropout_loss)) +
+  geom_segment( aes(x=variable, xend=variable, y=1, yend=dropout_loss), color="skyblue") +
+  geom_point( color="blue", size=4, alpha=0.6) +
+  theme_light() +
+  coord_flip() +
+  my_style() 
 
 
 pdp_classif_xgb  <- variable_response(explainer_classif_xgb, variable =  "AGE", type = "ale")
