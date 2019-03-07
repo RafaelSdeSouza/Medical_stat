@@ -256,13 +256,14 @@ vi_all <- rbind(vi_glm,vi_svm,vi_rf) %>%
   filter(variable %not_in% c("_baseline_","_full_model_"))
 
 
+pdf("vi.pdf",height = 6,width = 9)
 ggplot(vi_all,aes(x=variable,y=dropout_loss,fill = label)) +
   coord_flip() +
   geom_bar(stat="identity") +
   scale_fill_fivethirtyeight() +
   my_style() +
   facet_wrap(.~label)
-  
+ dev.off() 
 
 
 
