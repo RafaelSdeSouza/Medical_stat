@@ -19,6 +19,7 @@ require(xgboost)
 require(DALEX)
 source("my_style.R")
 require(ggthemes)
+require(kernlab)
 # Auxiliar function to randomly select a given column 
 
 
@@ -99,7 +100,7 @@ classif_svm <- ksvm(PREGNANT_NUMERIC~AGE+LIGATION_GROUP+TL_rand + TLD_rand + TLP
 
 classif_rf <-  randomForest(PREGNANT_NUMERIC~AGE+LIGATION_GROUP+TL_rand + 
                             TLD_rand + TLP_rand  + ANAS_rand + Fibr_rand, 
-                            data = Train, ntree=2000)
+                            data = Train, ntree=2500)
 
 
 
@@ -114,7 +115,7 @@ explain_glm  <- explain(classif_glm, label = "GLM",
                                         data = Test[,-1], y = yTest,
                                  predict_function = p_glm)
 
-explain_svm  <- explain(classif_xgb, label = "SVM", 
+explain_svm  <- explain(classif_svm, label = "SVM", 
                                         data = Test[,-1], y = yTest,
                                         predict_function = p_rf)
 
@@ -140,7 +141,7 @@ mp_all <- rbind(mp_glm,mp_svm,mp_rf)
 pdf("performance.pdf",height = 4,width = 5)
 ggplot(mp_all,aes(x=label,y=abs(diff),group=label,
                   fill=label)) +
-  geom_boxplot(notch = TRUE) +
+  geom_boxplot() +
  my_style() +
   coord_flip()+
   scale_color_fivethirtyeight() + ylab("ECDF") +
@@ -226,23 +227,47 @@ dev.off()
 
 
 # Variable Importance
+lfu = function(y, p){
+  sum(
+    -(y*log(p) + (1-y)*log(1-p))
+    )
+}
+lfu()
 
+log(1-p_rf(classif_rf))
+lfu(as.numeric(as.character(Train$PREGNANT_NUMERIC)),p_rf(classif_rf))
 
-vi_glm <- variable_importance(explain_glm,  n_sample = -1,loss_function = loss_root_mean_square,type = "ratio") 
+vi_glm <- variable_importance(explain_glm,  n_sample = -1,loss_function = lfu,type = "difference")
 
-vi_svm <- variable_importance(explain_svm,  n_sample = -1,loss_function = loss_root_mean_square,type = "ratio")
+vi_svm <- variable_importance(explain_svm,  n_sample = -1,loss_function = lfu,type = "difference") 
 
-vi_rf <- variable_importance(explain_rf,  n_sample = -1,loss_function = loss_root_mean_square,type = "ratio")
-
-plot(vi_glm , vi_svm ,vi_rf) + my_style() + aes(color=label) +
-  scale_color_fivethirtyeight() 
-
-
-
-
-
+vi_rf <- variable_importance(explain_rf,n_sample = -1,loss_function = lfu,type = "difference") 
 
 `%not_in%` <- purrr::negate(`%in%`)
+
+
+vi_all <- rbind(vi_glm,vi_svm,vi_rf) %>%
+  mutate(dropout_loss = abs(dropout_loss)) %>%
+  mutate(variable = recode(variable, TL_rand = "Tube length",
+                      TLD_rand = "Tube length distal",
+                      TLP_rand = "Tube length prox",
+                      ANAS_rand = "ANASTOMOSIS",
+                      Fibr_rand = "FIBROSIS"))  %>%
+  filter(variable %not_in% c("_baseline_","_full_model_"))
+
+
+ggplot(vi_all,aes(x=variable,y=dropout_loss,fill = label)) +
+  coord_flip() +
+  geom_bar(stat="identity") +
+  scale_fill_fivethirtyeight() +
+  my_style() +
+  facet_wrap(.~label)
+  
+
+
+
+
+
 
 
 
