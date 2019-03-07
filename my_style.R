@@ -5,14 +5,9 @@ my_style <- function() {
     
     #Text format:
     #This sets the font, size, type and colour of text for the chart's title
-    plot.title = ggplot2::element_text(family=font,
-                                       size=22,
-                                       face="bold",
-                                       color="#222222"),
+    plot.title = ggplot2::element_blank(),
     #This sets the font, size, type and colour of text for the chart's subtitle, as well as setting a margin between the title and the subtitle
-    plot.subtitle = ggplot2::element_text(family=font,
-                                          size=22,
-                                          margin=ggplot2::margin(9,0,9,0)),
+    plot.subtitle = ggplot2::element_blank(),
     plot.caption = ggplot2::element_blank(),
     #This leaves the caption text element empty, because it is set elsewhere in the finalise plot function
     
@@ -24,16 +19,16 @@ my_style <- function() {
     legend.title = ggplot2::element_blank(),
     legend.key = ggplot2::element_blank(),
     legend.text = ggplot2::element_text(family=font,
-                                        size=18,
+                                        size=15,
                                         color="#222222"),
     
     #Axis format
     #This sets the text font, size and colour for the axis test, as well as setting the margins and removes lines and ticks. In some cases, axis lines and axis ticks are things we would want to have in the chart - the cookbook shows examples of how to do so.
     axis.text = ggplot2::element_text(family=font,
-                                      size=18,
+                                      size=15,
                                       color="#222222"),
     axis.title  = ggplot2::element_text(family=font,
-                                      size=22,
+                                      size=18,
                                       color="#222222"),
     axis.text.x = ggplot2::element_text(margin=ggplot2::margin(5, b = 10)),
     axis.ticks = ggplot2::element_blank(),
@@ -48,9 +43,10 @@ my_style <- function() {
     #Blank background
     #This sets the panel background as blank, removing the standard grey ggplot background colour from the plot
     panel.background = ggplot2::element_blank(),
+    plot.background = ggplot2::element_blank(),
     
     #Strip background (#This sets the panel background for facet-wrapped plots to white, removing the standard grey ggplot background colour and sets the title size of the facet-wrap title to font size 22)
     strip.background = ggplot2::element_rect(fill="white"),
-    strip.text = ggplot2::element_text(size  = 22,  hjust = 0)
+    strip.text = ggplot2::element_text(size  = 18,  hjust = 0)
   )
 }

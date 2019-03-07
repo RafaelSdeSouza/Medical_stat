@@ -74,56 +74,178 @@ preg2 <- preg %>%
 
 
 # Split train vs test sample
-trainIndex <- createDataPartition(preg2$PREGNANT_NUMERIC, p = .7, 
+trainIndex <- createDataPartition(preg2$PREGNANT_NUMERIC, p = .9, 
                                   list = FALSE, 
                                   times = 1)
 Train <- preg2[trainIndex,]
 Test  <- preg2[-trainIndex,]
 
 
-classif_gbm <- train(PREGNANT_NUMERIC~AGE+LIGATION_GROUP+TL_rand + TLD_rand + TLP_rand  + ANAS_rand + Fibr_rand, data = Train , method = "gbm",  tuneLength = 1)
 
-classif_glm <- train(PREGNANT_NUMERIC~AGE+LIGATION_GROUP+TL_rand + TLD_rand + TLP_rand  + ANAS_rand + Fibr_rand, data = Train , method="glm", family="binomial")
-
-classif_xgb <- train(PREGNANT_NUMERIC~AGE+LIGATION_GROUP+TL_rand + TLD_rand + TLP_rand  + ANAS_rand + Fibr_rand, data = Train , method="gam", family=binomial(logit))
+#cor(Train[,3:8], use="complete.obs", method="kendall") 
 
 
-p_fun <- function(object, newdata){predict(object, newdata=newdata, type="prob")[,2]}
+# Train the models: GLM, GAM, RF
+
+classif_glm <- glm(PREGNANT_NUMERIC~AGE+LIGATION_GROUP+TL_rand + TLD_rand + 
+                   TLP_rand  + ANAS_rand + Fibr_rand, data = Train, 
+                   family=binomial(link = "logit"))
+
+
+classif_svm <- ksvm(PREGNANT_NUMERIC~AGE+LIGATION_GROUP+TL_rand + TLD_rand + TLP_rand  + 
+                    ANAS_rand + Fibr_rand,data = Train,
+                    kernel="rbfdot",type="C-bsvc",prob.model = TRUE)
+
+
+classif_rf <-  randomForest(PREGNANT_NUMERIC~AGE+LIGATION_GROUP+TL_rand + 
+                            TLD_rand + TLP_rand  + ANAS_rand + Fibr_rand, 
+                            data = Train, ntree=2000)
+
+
+
+p_rf <- function(object, newdata){predict(object, newdata=newdata, type="prob")[,2]}
+p_glm  <- function(object, newdata){predict(object, newdata=newdata, type="response")}
 yTest <- as.numeric(as.character(Test$PREGNANT_NUMERIC))
 
-explainer_classif_gbm <- explain(classif_gbm, label = "gbm",
-                                       data = Test[,-1], y = yTest,
-                                 predict_function = p_fun)
 
-explainer_classif_glm <- explain(classif_glm, label = "glm", 
+
+
+explain_glm  <- explain(classif_glm, label = "GLM", 
                                         data = Test[,-1], y = yTest,
-                                 predict_function = p_fun)
+                                 predict_function = p_glm)
 
-
-explainer_classif_xgb <- explain(classif_xgb, label = "gam", 
+explain_svm  <- explain(classif_xgb, label = "SVM", 
                                         data = Test[,-1], y = yTest,
-                                        predict_function = p_fun)
+                                        predict_function = p_rf)
+
+
+explain_rf <- explain(classif_rf, label = "RF",
+                      data = Test[,-1], y = yTest,
+                      predict_function = p_rf)
 
 
 
-mp_classif_gbm <- model_performance(explainer_classif_gbm)
-mp_classif_xgb <- model_performance(explainer_classif_xgb)
-mp_classif_glm <- model_performance(explainer_classif_glm)
 
-plot(mp_classif_gbm, mp_classif_glm,mp_classif_xgb) +  my_style() 
+# Model Performance
+
+
+
+mp_glm <- model_performance(explain_glm) %>% as.data.frame()
+mp_svm  <- model_performance(explain_svm) %>% as.data.frame()
+mp_rf <- model_performance(explain_rf) %>% as.data.frame()
+mp_all <- rbind(mp_glm,mp_svm,mp_rf)
+
+
+
+pdf("performance.pdf",height = 4,width = 5)
+ggplot(mp_all,aes(x=label,y=abs(diff),group=label,
+                  fill=label)) +
+  geom_boxplot(notch = TRUE) +
+ my_style() +
+  coord_flip()+
+  scale_color_fivethirtyeight() + ylab("ECDF") +
+  scale_fill_fivethirtyeight() +
+  xlab("|Residuals|")
+dev.off()
+
+#  Acumulated Local Effects plot
+
+
+# Age
+
+ale_glm_age  <- variable_response(explain_glm , variable =  "AGE", type = "pdp")
+ale_svm_age  <- variable_response(explain_svm, variable =  "AGE", type = "pdp")
+ale_rf_age   <- variable_response(explain_rf, variable =  "AGE", type = "pdp")
+
+ale_age_all <- rbind(ale_glm_age ,ale_svm_age,ale_rf_age  )
+
+
+pdf("ale_age.pdf",height = 4,width = 5)
+ggplot(ale_age_all,aes( x = x, y = y, group=label,color=label,linetype=label)) +  
+  geom_line() + geom_point() +  my_style() +
+ scale_color_fivethirtyeight() + ylab("Pregnancy likelihood") +
+  scale_fill_fivethirtyeight() +
+  xlab("AGE (yr)")
+dev.off()
+
+
+## Tube lenght properties
+
+ale_glm_TL1  <- variable_response(explain_glm , variable =  "TL_rand", type = "pdp")
+ale_glm_TL2   <- variable_response(explain_glm , variable =  "TLD_rand", type = "pdp")
+ale_glm_TL3  <- variable_response(explain_glm , variable =  "TLP_rand", type = "pdp")
+
+ale_svm_TL1   <- variable_response(explain_svm, variable =  "TL_rand", type = "pdp")
+ale_svm_TL2   <- variable_response(explain_svm, variable =  "TLD_rand", type = "pdp")
+ale_svm_TL3  <- variable_response(explain_svm, variable =  "TLP_rand", type = "pdp")
+
+
+ale_rf_TL1   <- variable_response(explain_rf, variable =  "TL_rand", type = "pdp")
+ale_rf_TL2   <- variable_response(explain_rf, variable =  "TLD_rand", type = "pdp")
+ale_rf_TL3   <- variable_response(explain_rf, variable =  "TLP_rand", type = "pdp")
+
+ale_TL_all <- rbind(ale_glm_TL1,ale_glm_TL2,ale_glm_TL3,
+                    ale_svm_TL1,ale_svm_TL2,ale_svm_TL3,
+                    ale_rf_TL1,ale_rf_TL2,ale_rf_TL3 ) %>%
+  mutate(var = recode(var, TL_rand = "Tube length",
+                      TLD_rand = "Tube length distal",
+                      TLP_rand = "Tube length prox"))
+
+pdf("ale_TL.pdf",height = 4.5,width = 13)
+ggplot(ale_TL_all,aes(x=x,y=y,group=label,color=label)) +
+  geom_line() + geom_point() +  my_style() +
+  scale_color_fivethirtyeight() +
+  facet_wrap(.~var) + my_style() +
+  ylab("Pregnancy likelihood") + xlab("Length (cm)") +
+  coord_cartesian(xlim=c(0,11.9))
+
+dev.off()
+
+
+## Ligation Group
+
+ale_glm_lg  <- variable_response(explain_glm , variable =  "LIGATION_GROUP", type = "factor")
+ale_svm_lg  <- variable_response(explain_svm, variable =  "LIGATION_GROUP", type = "factor")
+ale_rf_lg   <- variable_response(explain_rf, variable =  "LIGATION_GROUP", type = "factor")
+
+
+pdf("ale_LG.pdf",height = 7.5,width = 8.75)
+plot(ale_glm_lg,ale_svm_lg,ale_rf_lg) + my_style()
+dev.off()
+
+## Anamastosis
+
+
+
+
+## FIbrosis
+
+
+
+
+
+
+# Variable Importance
+
+
+vi_glm <- variable_importance(explain_glm,  n_sample = -1,loss_function = loss_root_mean_square,type = "ratio") 
+
+vi_svm <- variable_importance(explain_svm,  n_sample = -1,loss_function = loss_root_mean_square,type = "ratio")
+
+vi_rf <- variable_importance(explain_rf,  n_sample = -1,loss_function = loss_root_mean_square,type = "ratio")
+
+plot(vi_glm , vi_svm ,vi_rf) + my_style() + aes(color=label) +
+  scale_color_fivethirtyeight() 
+
+
+
+
 
 
 `%not_in%` <- purrr::negate(`%in%`)
 
 
-vi_classif_gbm <- variable_importance(explainer_classif_gbm, loss_function = loss_root_mean_square,type = "ratio") %>% 
-  filter(variable %not_in% c("_full_model_","_baseline_"))
 
-vi_classif_glm <- variable_importance(explainer_classif_glm, loss_function = loss_root_mean_square,type = "ratio")
-
-vi_classif_xgb <- variable_importance(explainer_classif_xgb, loss_function = loss_root_mean_square,type = "ratio")
-
-plot(vi_classif_gbm, vi_classif_glm,vi_classif_xgb)
 
 
 ggplot(vi_classif_gbm, aes(x=variable, y=dropout_loss)) +
@@ -134,18 +256,18 @@ ggplot(vi_classif_gbm, aes(x=variable, y=dropout_loss)) +
   my_style() 
 
 
-pdp_classif_xgb  <- variable_response(explainer_classif_xgb, variable =  "AGE", type = "ale")
-pdp_classif_gbm  <- variable_response(explainer_classif_gbm, variable =  "AGE", type = "ale")
-pdp_classif_glm  <- variable_response(explainer_classif_glm, variable =  "AGE", type = "ale")
+pdp_classif_xgb  <- variable_response(explainer_classif_xgb, variable =  "TLP_rand", type = "ale")
+pdp_classif_gbm  <- variable_response(explainer_classif_gbm, variable =  "TLP_rand", type = "ale")
+pdp_classif_glm  <- variable_response(explainer_classif_glm, variable = "TLP_rand", type = "ale")
 plot(pdp_classif_xgb, pdp_classif_gbm, pdp_classif_glm ) +  my_style() 
 
 
 
 
 
+svd_rf  <- single_variable(explainer_classif_xgb , variable = "LIGATION_GROUP", type = "factor")
 
-
-
+plot(svd_rf) +  my_style() 
 
 
 
