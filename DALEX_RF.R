@@ -41,6 +41,10 @@ preg <- read.csv("BTA-Patients-MAW.csv") %>% select(c("PREGNANT_NUMERIC",  "AGE"
    mutate(PREGNANT_NUMERIC = as.numeric(as.character(PREGNANT_NUMERIC))) %>% 
    droplevels()  
 
+
+outcomes <- read.csv("BTA-Pregnancies-anonymized.csv")
+
+
 # Sort left or right for each woman via bernoulli process
 rlist <- rbinom(nrow(preg),1,0.5) + 1
 
