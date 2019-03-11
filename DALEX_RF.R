@@ -42,6 +42,7 @@ preg <- read.csv("BTA-Patients-MAW.csv") %>% select(c("PREGNANT_NUMERIC",  "AGE"
    droplevels()  
 
 
+<<<<<<< HEAD
 aged <- cut(preg$AGE, breaks = c(20,30, 35, 40, 51))
 
 
@@ -57,6 +58,11 @@ ggplot(agev,aes(x=age,y = 100*(..count..)/sum(..count..),fill=LG)) +
   scale_fill_wsj() 
 dev.off()
 
+=======
+outcomes <- read.csv("BTA-Pregnancies-anonymized.csv")
+
+
+>>>>>>> 757d05183225e38018eed3fcd84b2e0603e2731e
 # Sort left or right for each woman via bernoulli process
 rlist <- rbinom(nrow(preg),1,0.5) + 1
 
