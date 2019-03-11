@@ -41,6 +41,22 @@ preg <- read.csv("BTA-Patients-MAW.csv") %>% select(c("PREGNANT_NUMERIC",  "AGE"
    mutate(PREGNANT_NUMERIC = as.numeric(as.character(PREGNANT_NUMERIC))) %>% 
    droplevels()  
 
+
+aged <- cut(preg$AGE, breaks = c(20,30, 35, 40, 51))
+
+
+#agev <- data.frame(value=as.vector(100*(table(aged)/nrow(preg))),age=levels(aged))
+
+agev <- data.frame(age = aged,LG=preg$LIGATION_GROUP) %>%
+  na.omit()
+
+pdf("Age.pdf",height = 5.5,width = 6.5)
+ggplot(agev,aes(x=age,y = 100*(..count..)/sum(..count..),fill=LG)) +
+  geom_bar() + my_style() +
+  ylab("Per cent in each group") + xlab("Age group (yrs)") +
+  scale_fill_wsj() 
+dev.off()
+
 # Sort left or right for each woman via bernoulli process
 rlist <- rbinom(nrow(preg),1,0.5) + 1
 
