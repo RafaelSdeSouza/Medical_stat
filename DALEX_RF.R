@@ -20,6 +20,7 @@ require(DALEX)
 source("my_style.R")
 require(ggthemes)
 require(kernlab)
+require(forcats)
 # Auxiliar function to randomly select a given column 
 
 
@@ -28,7 +29,8 @@ preg <- read.csv("BTA-Patients-MAW.csv") %>% select(c("PREGNANT_NUMERIC",  "AGE"
                                                         "LIGATION_GROUP", 
                                                       "TUBELENGTH_L_DISTAL",  "TUBELENGTH_R_DISTAL", 
                                                       "LEFT_TUBE_LENGTH",     "RIGHT_TUBE_LENGTH",
-                                                      "TUBELENGTH_L_PROX",    "TUBELENGTH_R_PROX",        
+                                                      "TUBELENGTH_L_PROX",    "TUBELENGTH_R_PROX",  
+                                                       "L_DIAMETER_NUMERIC","R_DIAMETER_NUMERIC",
                                                       "L_DIAMETER_NUMERIC",   "R_DIAMETER_NUMERIC", 
                                                       "L_FIBROSIS_NUMERIC",   "R_FIBROSIS_NUMERIC",
                                                       "ANASTOMOSIS2_NUMERIC","ANASTOMOSIS1_NUMERIC"
@@ -42,12 +44,8 @@ preg <- read.csv("BTA-Patients-MAW.csv") %>% select(c("PREGNANT_NUMERIC",  "AGE"
    droplevels()  
 
 
-<<<<<<< HEAD
+# Population summary
 aged <- cut(preg$AGE, breaks = c(20,30, 35, 40, 51))
-
-
-#agev <- data.frame(value=as.vector(100*(table(aged)/nrow(preg))),age=levels(aged))
-
 agev <- data.frame(age = aged,LG=preg$LIGATION_GROUP) %>%
   na.omit()
 
@@ -55,14 +53,92 @@ pdf("Age.pdf",height = 5.5,width = 6.5)
 ggplot(agev,aes(x=age,y = 100*(..count..)/sum(..count..),fill=LG)) +
   geom_bar() + my_style() +
   ylab("Per cent in each group") + xlab("Age group (yrs)") +
-  scale_fill_wsj() 
+  scale_fill_wsj(name="") + theme(legend.spacing.x = unit(0.15, 'cm'))
 dev.off()
 
-=======
+
+# Anastomosis
+PyrAN <-  preg[,c("ANASTOMOSIS2_NUMERIC","ANASTOMOSIS1_NUMERIC")]  %>%
+  melt() %>%  mutate(variable = recode(variable, ANASTOMOSIS2_NUMERIC = "Left tube",
+                                       ANASTOMOSIS1_NUMERIC = "Right tube")) 
+
+pdf("Anastomosis.pdf",height = 5.5,width = 6.5)
+ggplot(PyrAN, aes(x = value, y =  100*(..count..)/sum(..count..), fill = variable)) +   # Fill column
+  geom_bar()   +  my_style() +
+  scale_fill_wsj(name = "") + 
+  xlab("Anastomosis segment position difference") +
+  ylab(" Per cent in each group") + 
+  theme(legend.spacing.x = unit(0.15, 'cm'))
+dev.off()
+
+
+# Diameter 
+PyrDiam <-  preg[,c("L_DIAMETER_NUMERIC","R_DIAMETER_NUMERIC")]  %>%
+  melt() %>%  mutate(variable = recode(variable, L_DIAMETER_NUMERIC = "Left diameter",
+                                       R_DIAMETER_NUMERIC = "Right diameter")) %>%
+              mutate(value = recode(value, "1" = "Similar",
+                                           "2" = "Somewhat dissimilar",
+                                           "3" = "Dissimilar")) %>% 
+
+          mutate(value = factor(value,levels=c("Similar","Somewhat dissimilar","Dissimilar"))) 
+
+
+pdf("diameter.pdf",height = 5.5,width = 6.5)
+ggplot(PyrDiam, aes(x = value, y =  100*(..count..)/sum(..count..), fill = variable)) +   # Fill column
+  geom_bar()   +  my_style() +
+  scale_fill_wsj(name = "") + 
+  xlab("Diameter") +
+  ylab(" Per cent in each group") + 
+  theme(legend.spacing.x = unit(0.15, 'cm'))
+dev.off()
+
+
+# Fibrosis
+PyrFib <-  preg[,c("L_FIBROSIS_NUMERIC", "R_FIBROSIS_NUMERIC")]  %>%
+  melt() %>%  mutate(variable = recode(variable, L_FIBROSIS_NUMERIC = "Left tube",
+                                       R_FIBROSIS_NUMERIC = "Right tube")) %>%
+  mutate(value = recode(value, "0" = "None",
+                        "1" = "Mild",
+                        "2" = "Moderate",
+                        "3" = "Severe"))  %>% 
+  mutate(value = factor(value,levels=c("None","Mild","Moderate","Severe"))) 
+
+
+
+pdf("fibrosis.pdf",height = 5.5,width = 6.5)
+ggplot(PyrFib, aes(x = value, y =  100*(..count..)/sum(..count..), fill = variable)) +   # Fill column
+  geom_bar()   +  my_style() +
+  scale_fill_wsj(name = "") + 
+  xlab("Fibrosis") +
+  ylab(" Per cent in each group") + 
+  theme(legend.spacing.x = unit(0.15, 'cm'))
+dev.off()
+
+
+
+PyrAN <- PyrAN %>% mutate(class = "Anastomosis")
+
+PyrDiam <- PyrDiam  %>% mutate(class = "Diameter")
+
+PyrFib <- PyrFib  %>% mutate(class = "Fibrosis")
+
+Py_all <- rbind(PyrAN,PyrDiam,PyrFib)
+
+
+ggplot(Py_all, aes(x = value, y =  100*(..count..)/sum(..count..), fill = variable)) +   # Fill column
+  geom_bar()   +  my_style() +
+  scale_fill_wsj(name = "") + 
+  xlab("Fibrosis") +
+  ylab(" Per cent in each group") + 
+  theme(legend.spacing.x = unit(0.15, 'cm')) +
+  facet_wrap(.~class)
+
+
+
+
 outcomes <- read.csv("BTA-Pregnancies-anonymized.csv")
 
 
->>>>>>> 757d05183225e38018eed3fcd84b2e0603e2731e
 # Sort left or right for each woman via bernoulli process
 rlist <- rbinom(nrow(preg),1,0.5) + 1
 

@@ -16,7 +16,7 @@ my_style <- function() {
     legend.position = "top",
     legend.text.align = 0,
     legend.background = ggplot2::element_blank(),
-    legend.title = ggplot2::element_blank(),
+ #   legend.title = ggplot2::element_blank(),
     legend.key = ggplot2::element_blank(),
     legend.text = ggplot2::element_text(family=font,
                                         size=15,
