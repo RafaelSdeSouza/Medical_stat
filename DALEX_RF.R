@@ -61,6 +61,10 @@ dev.off()
 PyrAN <-  preg[,c("ANASTOMOSIS2_NUMERIC","ANASTOMOSIS1_NUMERIC")]  %>%
   melt() %>%  mutate(variable = recode(variable, ANASTOMOSIS2_NUMERIC = "Left",
                                        ANASTOMOSIS1_NUMERIC = "Right")) %>%
+  mutate(value = recode(value, "0" = "Identical",
+                        "1" = "1-SPD",
+                        "2" = "2-SPD",
+                        "3" = "3-SPD")) %>% 
   mutate(class = "Anastomosis") 
 
 pdf("Anastomosis.pdf",height = 5.5,width = 6.5)
@@ -121,7 +125,7 @@ dev.off()
 
 
 Py_all <- rbind(PyrAN,PyrDiam,PyrFib) %>% 
-  mutate(value = factor(value,levels=c("0","1","2","3",
+  mutate(value = factor(value,levels=c("Identical","1-SPD","2-SPD","3-SPD",
                                        "Similar","Somewhat dissimilar","Dissimilar","None","Mild","Moderate","Severe"))) 
 
 
@@ -142,6 +146,7 @@ outcomes <- read.csv("BTA-Pregnancies-anonymized.csv")
 
 
 # Sort left or right for each woman via bernoulli process
+set.seed(42)
 rlist <- rbinom(nrow(preg),1,0.5) + 1
 
 temp1 <- preg[,c("LEFT_TUBE_LENGTH","RIGHT_TUBE_LENGTH")]
@@ -149,18 +154,21 @@ temp2 <- preg[,c( "TUBELENGTH_L_DISTAL",  "TUBELENGTH_R_DISTAL")]
 temp3 <- preg[,c("TUBELENGTH_L_PROX", "TUBELENGTH_R_PROX")]
 temp4 <- preg[,c("ANASTOMOSIS2_NUMERIC","ANASTOMOSIS1_NUMERIC")]
 temp5 <- preg[,c("L_FIBROSIS_NUMERIC","R_FIBROSIS_NUMERIC")]
+temp6 <- preg[,c("L_DIAMETER_NUMERIC",   "R_DIAMETER_NUMERIC")]
 
 TL_rand <- c()
 TLD_rand <- c()
 TLP_rand <- c()
 ANAS_rand <- c()
 Fibr_rand <- c()
+Diam_rand <- c()
 for (i in 1:nrow(preg)) {
 TL_rand <-  append(TL_rand,temp1[i,rlist[i]])
 TLD_rand <- append(TLD_rand,temp2[i,rlist[i]])
 TLP_rand <- append(TLP_rand,temp3[i,rlist[i]])
 ANAS_rand <- append(ANAS_rand,temp4[i,rlist[i]])
 Fibr_rand <- append(Fibr_rand,temp5[i,rlist[i]])
+Diam_rand <- append(Diam_rand,temp6[i,rlist[i]])
 }
 
 # Create new dataset with choosen features
@@ -171,17 +179,23 @@ preg2 <- preg %>%
   mutate(ANAS_rand = ANAS_rand) %>%
   mutate(Fibr_rand = Fibr_rand) %>%
   mutate(PREGNANT_NUMERIC = as.factor(PREGNANT_NUMERIC)) %>%
-  select(c("PREGNANT_NUMERIC","LIGATION_GROUP", "AGE", "TL_rand", "TLD_rand","TLP_rand","ANAS_rand","Fibr_rand"))
+  mutate(Diam_rand  = Diam_rand) %>%
+  select(c("PREGNANT_NUMERIC",
+           #"LIGATION_GROUP",
+           "AGE", "TL_rand", "TLD_rand","TLP_rand","ANAS_rand","Fibr_rand",
+           "Diam_rand"))
 
 
 # Split train vs test sample
-trainIndex <- createDataPartition(preg2$PREGNANT_NUMERIC, p = .9, 
+trainIndex <- createDataPartition(preg2$PREGNANT_NUMERIC, p = .7, 
                                   list = FALSE, 
                                   times = 1)
-Train <- preg2[trainIndex,] %>% mutate(LIGATION_GROUP = as.numeric(LIGATION_GROUP))
+Train <- preg2[trainIndex,] 
+#%>% mutate(LIGATION_GROUP = as.numeric(LIGATION_GROUP))
 
 
-Test  <- preg2[-trainIndex,]  %>% mutate(LIGATION_GROUP = as.numeric(LIGATION_GROUP))
+Test  <- preg2[-trainIndex,]  
+#%>% mutate(LIGATION_GROUP = as.numeric(LIGATION_GROUP))
 
 
 
@@ -190,14 +204,25 @@ Test  <- preg2[-trainIndex,]  %>% mutate(LIGATION_GROUP = as.numeric(LIGATION_GR
 
 # Train the models: GLM, GAM, RF
 
-classif_glm <- glm(PREGNANT_NUMERIC~LIGATION_GROUP+AGE+TL_rand + TLD_rand + 
-                   TLP_rand  + ANAS_rand + Fibr_rand, data = Train, 
+classif_glm <- glm(PREGNANT_NUMERIC~
+                     #LIGATION_GROUP
+                   AGE+TL_rand + TLD_rand + 
+                  TLP_rand  + ANAS_rand + Fibr_rand + Diam_rand, data = Train, 
                    family=binomial(link = "logit"))
 
 
-classif_rf <-  randomForest(PREGNANT_NUMERIC~LIGATION_GROUP+AGE+TL_rand + 
-                            TLD_rand + TLP_rand  + ANAS_rand + Fibr_rand, 
-                            data = Train, ntree=2500)
+classif_rf <-  randomForest(PREGNANT_NUMERIC~
+                              #LIGATION_GROUP+
+                               AGE+
+                               TL_rand + 
+                              TLD_rand + 
+  TLP_rand  + 
+                               ANAS_rand + Fibr_rand + Diam_rand, 
+                              data = Train, ntree=2000,nodesize=50)
+
+varImpPlot(classif_rf)
+
+
 
 
 
@@ -219,14 +244,14 @@ explain_rf <- explain(classif_rf, label = "RF",
 
 
 
+
 # Model Performance
 
 
-
+# residuals
 mp_glm <- model_performance(explain_glm) %>% as.data.frame()
 mp_rf <- model_performance(explain_rf) %>% as.data.frame()
 mp_all <- rbind(mp_glm,mp_rf)
-
 
 
 pdf("performance.pdf",height = 4,width = 5)
@@ -240,6 +265,27 @@ ggplot(mp_all,aes(x=label,y=abs(diff),group=label,
   xlab("|Residuals|")
 dev.off()
 
+
+# AUC
+
+
+pred_glm <- p_glm(classif_glm,newdata = Test[,-1])
+pred_rf <- p_rf(classif_rf ,newdata = Test[,-1]) 
+
+
+plot.roc(yTest,pred_glm, 
+         percent=TRUE,  ci=TRUE, print.auc=TRUE,
+         thresholds="best",
+         print.thres="best")
+
+
+plot.roc( yTest,pred_rf, 
+         percent=TRUE,  ci=TRUE, print.auc=TRUE,
+         thresholds="best",
+         print.thres="best")
+
+
+
 #  Acumulated Local Effects plot
 
 
@@ -252,11 +298,12 @@ ale_age_all <- rbind(ale_glm_age,ale_rf_age)
 
 
 pdf("ale_age.pdf",height = 4,width = 5)
-ggplot(ale_age_all,aes( x = x, y = y, group=label,color=label,linetype=label)) +  
-  geom_line() + geom_point() +  my_style() +
+ggplot(ale_rf_age,aes( x = x, y = y, group=label,color=label,linetype=label)) +  
+  geom_smooth(method = 'loess',n = 500,show.legend=F) + geom_point() +  my_style() +
  scale_color_fivethirtyeight() + ylab("Pregnancy likelihood") +
   scale_fill_fivethirtyeight() +
-  xlab("AGE (yr)")
+  xlab("AGE (yr)") + theme(legend.position = "none") +
+  coord_cartesian(xlim=c(21,50))
 dev.off()
 
 
