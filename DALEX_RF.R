@@ -59,8 +59,9 @@ dev.off()
 
 # Anastomosis
 PyrAN <-  preg[,c("ANASTOMOSIS2_NUMERIC","ANASTOMOSIS1_NUMERIC")]  %>%
-  melt() %>%  mutate(variable = recode(variable, ANASTOMOSIS2_NUMERIC = "Left tube",
-                                       ANASTOMOSIS1_NUMERIC = "Right tube")) 
+  melt() %>%  mutate(variable = recode(variable, ANASTOMOSIS2_NUMERIC = "Left",
+                                       ANASTOMOSIS1_NUMERIC = "Right")) %>%
+  mutate(class = "Anastomosis") 
 
 pdf("Anastomosis.pdf",height = 5.5,width = 6.5)
 ggplot(PyrAN, aes(x = value, y =  100*(..count..)/sum(..count..), fill = variable)) +   # Fill column
@@ -74,12 +75,12 @@ dev.off()
 
 # Diameter 
 PyrDiam <-  preg[,c("L_DIAMETER_NUMERIC","R_DIAMETER_NUMERIC")]  %>%
-  melt() %>%  mutate(variable = recode(variable, L_DIAMETER_NUMERIC = "Left diameter",
-                                       R_DIAMETER_NUMERIC = "Right diameter")) %>%
+  melt() %>%  mutate(variable = recode(variable, L_DIAMETER_NUMERIC = "Left",
+                                       R_DIAMETER_NUMERIC = "Right")) %>%
               mutate(value = recode(value, "1" = "Similar",
                                            "2" = "Somewhat dissimilar",
                                            "3" = "Dissimilar")) %>% 
-
+           mutate(class = "Diameter")  %>%
           mutate(value = factor(value,levels=c("Similar","Somewhat dissimilar","Dissimilar"))) 
 
 
@@ -95,12 +96,13 @@ dev.off()
 
 # Fibrosis
 PyrFib <-  preg[,c("L_FIBROSIS_NUMERIC", "R_FIBROSIS_NUMERIC")]  %>%
-  melt() %>%  mutate(variable = recode(variable, L_FIBROSIS_NUMERIC = "Left tube",
-                                       R_FIBROSIS_NUMERIC = "Right tube")) %>%
+  melt() %>%  mutate(variable = recode(variable, L_FIBROSIS_NUMERIC = "Left",
+                                       R_FIBROSIS_NUMERIC = "Right")) %>%
   mutate(value = recode(value, "0" = "None",
                         "1" = "Mild",
                         "2" = "Moderate",
                         "3" = "Severe"))  %>% 
+   mutate(class = "Fibrosis") %>% 
   mutate(value = factor(value,levels=c("None","Mild","Moderate","Severe"))) 
 
 
@@ -116,23 +118,23 @@ dev.off()
 
 
 
-PyrAN <- PyrAN %>% mutate(class = "Anastomosis")
-
-PyrDiam <- PyrDiam  %>% mutate(class = "Diameter")
-
-PyrFib <- PyrFib  %>% mutate(class = "Fibrosis")
-
-Py_all <- rbind(PyrAN,PyrDiam,PyrFib)
 
 
-ggplot(Py_all, aes(x = value, y =  100*(..count..)/sum(..count..), fill = variable)) +   # Fill column
-  geom_bar()   +  my_style() +
-  scale_fill_wsj(name = "") + 
-  xlab("Fibrosis") +
+Py_all <- rbind(PyrAN,PyrDiam,PyrFib) %>% 
+  mutate(value = factor(value,levels=c("0","1","2","3",
+                                       "Similar","Somewhat dissimilar","Dissimilar","None","Mild","Moderate","Severe"))) 
+
+
+pdf("anatomy.pdf",height = 5.5,width = 15)
+ggplot(Py_all, aes(x = value, y =  100*(..count..)/sum(..count..), fill = class,alpha=variable)) +   # Fill column
+  geom_bar(position = "dodge")   +  my_style() +
+  scale_fill_wsj(name = "") +
+  scale_alpha_manual(values=c(0.6,1)) +
+  xlab("") +
   ylab(" Per cent in each group") + 
-  theme(legend.spacing.x = unit(0.15, 'cm')) +
-  facet_wrap(.~class)
-
+  theme(legend.position = "nome") +
+  facet_wrap(.~class,scale="free_x")
+dev.off()
 
 
 
