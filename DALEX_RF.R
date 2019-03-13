@@ -65,16 +65,19 @@ PyrAN <-  preg[,c("ANASTOMOSIS2_NUMERIC","ANASTOMOSIS1_NUMERIC")]  %>%
                         "1" = "1-SPD",
                         "2" = "2-SPD",
                         "3" = "3-SPD")) %>% 
+  mutate(value = factor(value,levels=c("Identical","1-SPD","2-SPD","3-SPD"))) %>% 
+
   mutate(class = "Anastomosis") 
 
-pdf("Anastomosis.pdf",height = 5.5,width = 6.5)
-ggplot(PyrAN, aes(x = value, y =  100*(..count..)/sum(..count..), fill = variable)) +   # Fill column
-  geom_bar()   +  my_style() +
+#pdf("Anastomosis.pdf",height = 5.5,width = 6.5)
+gana <- ggplot(PyrAN, aes(x = value, y =  100*(..count..)/sum(..count..), fill = variable,alpha=variable)) +   # Fill column
+  geom_bar(position = "dodge",fill="#c72e29")   +  my_style() +
+  scale_alpha_manual(values=c(0.6,1)) +
   scale_fill_wsj(name = "") + 
-  xlab("Anastomosis segment position difference") +
+  xlab("Anastomosis") +
   ylab(" Per cent in each group") + 
-  theme(legend.spacing.x = unit(0.15, 'cm'))
-dev.off()
+  theme(legend.spacing.x = unit(0.15, 'cm'),legend.position = "none") 
+#dev.off()
 
 
 # Diameter 
@@ -88,14 +91,14 @@ PyrDiam <-  preg[,c("L_DIAMETER_NUMERIC","R_DIAMETER_NUMERIC")]  %>%
           mutate(value = factor(value,levels=c("Similar","Somewhat dissimilar","Dissimilar"))) 
 
 
-pdf("diameter.pdf",height = 5.5,width = 6.5)
-ggplot(PyrDiam, aes(x = value, y =  100*(..count..)/sum(..count..), fill = variable)) +   # Fill column
-  geom_bar()   +  my_style() +
-  scale_fill_wsj(name = "") + 
+#pdf("diameter.pdf",height = 5.5,width = 6.5)
+gdiam <- ggplot(PyrDiam, aes(x = value, y =  100*(..count..)/sum(..count..),alpha=variable)) +   # Fill column
+  geom_bar(position = "dodge",fill = "#016392")   +  my_style() +
+  scale_alpha_manual(values=c(0.6,1)) +
   xlab("Diameter") +
   ylab(" Per cent in each group") + 
-  theme(legend.spacing.x = unit(0.15, 'cm'))
-dev.off()
+  theme(legend.spacing.x = unit(0.15, 'cm'),legend.position = "none") 
+#dev.off()
 
 
 # Fibrosis
@@ -111,16 +114,39 @@ PyrFib <-  preg[,c("L_FIBROSIS_NUMERIC", "R_FIBROSIS_NUMERIC")]  %>%
 
 
 
-pdf("fibrosis.pdf",height = 5.5,width = 6.5)
-ggplot(PyrFib, aes(x = value, y =  100*(..count..)/sum(..count..), fill = variable)) +   # Fill column
-  geom_bar()   +  my_style() +
+#pdf("fibrosis.pdf",height = 5.5,width = 6.5)
+gfib <- ggplot(PyrFib, aes(x = value, y =  100*(..count..)/sum(..count..), fill = variable,alpha=variable)) +   # Fill column
+  geom_bar(position = "dodge",fill="#be9c2e")   +  my_style() +
+  scale_alpha_manual(values=c(0.6,1)) +
   scale_fill_wsj(name = "") + 
   xlab("Fibrosis") +
   ylab(" Per cent in each group") + 
-  theme(legend.spacing.x = unit(0.15, 'cm'))
+  theme(legend.spacing.x = unit(0.15, 'cm'),legend.position = "none") 
+#dev.off()
+
+
+# Tube length
+PyrTL <-  preg[,c("LEFT_TUBE_LENGTH","RIGHT_TUBE_LENGTH")]  %>%
+  melt() %>%  mutate(variable = recode(variable, LEFT_TUBE_LENGTH = "Left",
+                                       RIGHT_TUBE_LENGTH = "Right"))  %>% 
+  mutate(class = "Tube length (cm)") 
+
+
+
+
+
+gTL <- ggplot(data= PyrTL,aes(x=variable,y =  value, alpha=variable)) +
+  geom_boxplot(fill="#098154")  +  my_style() +
+  scale_fill_wsj(name = "") +
+  scale_alpha_manual(values=c(0.6,1)) +
+  ylab("Tube lenght (cm)") + theme(legend.position = "none",axis.text.y = element_blank(),
+                                   axis.ticks.y = element_blank()) + xlab("") +
+  coord_flip()
+
+
+pdf("anatomy.pdf",height = 11.5,width = 12)
+grid.arrange(gana,gdiam , gfib ,gTL,  ncol = 2,nrow=2)
 dev.off()
-
-
 
 
 
@@ -129,20 +155,27 @@ Py_all <- rbind(PyrAN,PyrDiam,PyrFib) %>%
                                        "Similar","Somewhat dissimilar","Dissimilar","None","Mild","Moderate","Severe"))) 
 
 
-pdf("anatomy.pdf",height = 5.5,width = 15)
-ggplot(Py_all, aes(x = value, y =  100*(..count..)/sum(..count..), fill = class,alpha=variable)) +   # Fill column
+
+
+pdf("anatomy.pdf",height = 11.5,width = 12)
+gg1 <- ggplot(Py_all, aes(x = value, y =  100*(..count..)/sum(..count..), fill = class,alpha=variable)) +   # Fill column
   geom_bar(position = "dodge")   +  my_style() +
   scale_fill_wsj(name = "") +
   scale_alpha_manual(values=c(0.6,1)) +
   xlab("") +
   ylab(" Per cent in each group") + 
-  theme(legend.position = "nome") +
-  facet_wrap(.~class,scale="free_x")
+  theme(legend.position = "none") +
+  facet_wrap(.~class,scale="free",nrow=2)
+
 dev.off()
 
+custom <- gg1
 
 
-outcomes <- read.csv("BTA-Pregnancies-anonymized.csv")
+
+
+
+
 
 
 # Sort left or right for each woman via bernoulli process
@@ -182,7 +215,7 @@ preg2 <- preg %>%
   mutate(Diam_rand  = Diam_rand) %>%
   select(c("PREGNANT_NUMERIC",
            #"LIGATION_GROUP",
-           "AGE", "TL_rand", "TLD_rand","TLP_rand","ANAS_rand","Fibr_rand",
+           "AGE", "TL_rand", "ANAS_rand","Fibr_rand",
            "Diam_rand"))
 
 
@@ -206,8 +239,7 @@ Test  <- preg2[-trainIndex,]
 
 classif_glm <- glm(PREGNANT_NUMERIC~
                      #LIGATION_GROUP
-                   AGE+TL_rand + TLD_rand + 
-                  TLP_rand  + ANAS_rand + Fibr_rand + Diam_rand, data = Train, 
+                   AGE+TL_rand +  ANAS_rand + Fibr_rand + Diam_rand, data = Train, 
                    family=binomial(link = "logit"))
 
 
@@ -215,12 +247,8 @@ classif_rf <-  randomForest(PREGNANT_NUMERIC~
                               #LIGATION_GROUP+
                                AGE+
                                TL_rand + 
-                              TLD_rand + 
-  TLP_rand  + 
                                ANAS_rand + Fibr_rand + Diam_rand, 
                               data = Train, ntree=2000,nodesize=50)
-
-varImpPlot(classif_rf)
 
 
 
@@ -297,13 +325,13 @@ ale_rf_age   <- variable_response(explain_rf, variable =  "AGE", type = "pdp")
 ale_age_all <- rbind(ale_glm_age,ale_rf_age)
 
 
-pdf("ale_age.pdf",height = 4,width = 5)
-ggplot(ale_rf_age,aes( x = x, y = y, group=label,color=label,linetype=label)) +  
-  geom_smooth(method = 'loess',n = 500,show.legend=F) + geom_point() +  my_style() +
+pdf("ale_age.pdf",height = 4,width = 6)
+ggplot(ale_rf_age,aes( x = x, y = y, group=label,color=label,fill=label)) +  
+  geom_smooth(method = 'loess',span=0.25)  +  my_style() +
  scale_color_fivethirtyeight() + ylab("Pregnancy likelihood") +
   scale_fill_fivethirtyeight() +
   xlab("AGE (yr)") + theme(legend.position = "none") +
-  coord_cartesian(xlim=c(21,50))
+  coord_cartesian(xlim=c(21,50),ylim=c(0,1))
 dev.off()
 
 
