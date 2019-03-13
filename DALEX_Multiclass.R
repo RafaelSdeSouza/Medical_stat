@@ -91,8 +91,6 @@ Test  <- outcomes2[-trainIndex,]
 classif_rf <-  randomForest(OutcomeGpNumeric~
                               AGE+
                               TL_rand + 
-                              TLD_rand + 
-                              TLP_rand  + 
                               ANAS_rand + Fibr_rand + Diam_rand, 
                             data = Train, ntree=2000,nodesize=50)
 
