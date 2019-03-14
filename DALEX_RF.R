@@ -47,6 +47,8 @@ preg <- read.csv("BTA-Patients-MAW.csv") %>% select(c("PREGNANT_NUMERIC",  "AGE"
 # Population summary
 aged <- cut(preg$AGE, breaks = c(20,30, 35, 40, 51))
 agev <- data.frame(age = aged,LG=preg$LIGATION_GROUP) %>%
+  mutate(LG = factor(LG,levels=c("Clip","Ring","Coagulation","Ligation/Resection"))) %>%
+
   na.omit()
 
 pdf("Age.pdf",height = 5.5,width = 6.5)
