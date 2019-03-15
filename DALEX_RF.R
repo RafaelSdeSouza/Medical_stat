@@ -173,9 +173,6 @@ gg1 <- ggplot(Py_all, aes(x = value, y =  100*(..count..)/sum(..count..), fill =
 
 dev.off()
 
-custom <- gg1
-
-
 
 
 
