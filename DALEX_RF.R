@@ -54,7 +54,7 @@ agev <- data.frame(age = aged,LG=preg$LIGATION_GROUP) %>%
 pdf("Age.pdf",height = 5.5,width = 6.5)
 ggplot(agev,aes(x=age,y = 100*(..count..)/sum(..count..),fill=LG)) +
   geom_bar() + my_style() +
-  ylab("Per cent in each group") + xlab("Age group (yrs)") +
+  ylab("Percent in each group") + xlab("Age group (yrs)") +
   scale_fill_wsj(name="") + theme(legend.spacing.x = unit(0.15, 'cm'))
 dev.off()
 
@@ -77,7 +77,7 @@ gana <- ggplot(PyrAN, aes(x = value, y =  100*(..count..)/sum(..count..), fill =
   scale_alpha_manual(values=c(0.6,1)) +
   scale_fill_wsj(name = "") + 
   xlab("Anastomosis") +
-  ylab(" Per cent in each group") + 
+  ylab("") + 
   theme(legend.spacing.x = unit(0.15, 'cm'),legend.position = "none") 
 #dev.off()
 
@@ -98,7 +98,7 @@ gdiam <- ggplot(PyrDiam, aes(x = value, y =  100*(..count..)/sum(..count..),alph
   geom_bar(position = "dodge",fill = "#016392")   +  my_style() +
   scale_alpha_manual(values=c(0.6,1)) +
   xlab("Diameter") +
-  ylab(" Per cent in each group") + 
+  ylab("") + 
   theme(legend.spacing.x = unit(0.15, 'cm'),legend.position = "none") 
 #dev.off()
 
@@ -122,7 +122,7 @@ gfib <- ggplot(PyrFib, aes(x = value, y =  100*(..count..)/sum(..count..), fill 
   scale_alpha_manual(values=c(0.6,1)) +
   scale_fill_wsj(name = "") + 
   xlab("Fibrosis") +
-  ylab(" Per cent in each group") + 
+  ylab("") + 
   theme(legend.spacing.x = unit(0.15, 'cm'),legend.position = "none") 
 #dev.off()
 
@@ -131,23 +131,25 @@ gfib <- ggplot(PyrFib, aes(x = value, y =  100*(..count..)/sum(..count..), fill 
 PyrTL <-  preg[,c("LEFT_TUBE_LENGTH","RIGHT_TUBE_LENGTH")]  %>%
   melt() %>%  mutate(variable = recode(variable, LEFT_TUBE_LENGTH = "Left",
                                        RIGHT_TUBE_LENGTH = "Right"))  %>% 
-  mutate(class = "Tube length (cm)") 
+  mutate(class = "Tube length (cm)") %>% 
+  mutate(variable = factor(variable,levels=c("Left","Right"))) 
 
 
 
 
 
-gTL <- ggplot(data= PyrTL,aes(x=variable,y =  value, alpha=variable)) +
-  geom_boxplot(fill="#098154")  +  my_style() +
+
+gTL <- ggplot(data= PyrTL,aes(x=value, alpha=variable,group=variable)) +
+  geom_histogram(position='dodge',fill="#098154",binwidth = 0.5,aes(group=variable,y = 100*(..count..)/sum(..count..)))  +  my_style() +
   scale_fill_wsj(name = "") +
   scale_alpha_manual(values=c(0.6,1)) +
-  ylab("Tube lenght (cm)") + theme(legend.position = "none",axis.text.y = element_blank(),
-                                   axis.ticks.y = element_blank()) + xlab("") +
-  coord_flip()
+  xlab("Tube lenght (cm)") + theme(legend.position = "none") + ylab("") 
 
 
-pdf("anatomy.pdf",height = 11.5,width = 12)
-grid.arrange(gana,gdiam , gfib ,gTL,  ncol = 2,nrow=2)
+pdf("anatomy.pdf",height = 9.5,width = 11)
+grid.arrange(gana,gdiam , gfib ,gTL,  ncol = 2,nrow=2,
+             left =  text_grob("Percent in each group", size=18,rot=90) )
+
 dev.off()
 
 
@@ -239,9 +241,9 @@ Test  <- preg2[-trainIndex,]
 
 # Train the models: GLM, GAM, RF
 
-classif_glm <- glm(PREGNANT_NUMERIC~
+classif_glm <- gam(PREGNANT_NUMERIC~
                      #LIGATION_GROUP
-                   AGE+TL_rand +  ANAS_rand + Fibr_rand + Diam_rand, data = Train, 
+                   s(AGE)+s(TL_rand) +  ANAS_rand + Fibr_rand + Diam_rand, data = Train, 
                    family=binomial(link = "logit"))
 
 
@@ -263,7 +265,7 @@ yTest <- as.numeric(as.character(Test$PREGNANT_NUMERIC))
 
 
 
-explain_glm  <- explain(classif_glm, label = "GLM", 
+explain_glm  <- explain(classif_glm, label = "GAM", 
                                         data = Test[,-1], y = yTest,
                                  predict_function = p_glm)
 
@@ -328,12 +330,13 @@ ale_age_all <- rbind(ale_glm_age,ale_rf_age)
 
 
 pdf("ale_age.pdf",height = 4,width = 6)
-ggplot(ale_rf_age,aes( x = x, y = y, group=label,color=label,fill=label)) +  
+gg <- ggplot(ale_age_all,aes( x = x, y = y, group=label,color=label,fill=label)) +  
   geom_smooth(method = 'loess',span=0.25)  +  my_style() +
- scale_color_fivethirtyeight() + ylab("Pregnancy likelihood") +
-  scale_fill_fivethirtyeight() +
-  xlab("AGE (yr)") + theme(legend.position = "none") +
-  coord_cartesian(xlim=c(21,50),ylim=c(0,1))
+ scale_color_wsj() + ylab("Pregnancy likelihood") +
+  scale_fill_wsj() +
+  xlab("AGE (yr)") + 
+  coord_cartesian(xlim=c(19.5,49),ylim=c(0,1))
+direct.label(gg,"lasso.labels")
 dev.off()
 
 
