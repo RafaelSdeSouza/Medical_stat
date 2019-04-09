@@ -20,7 +20,9 @@ require(forcats)
 
 
 
-outcomes <- read.csv("BTA-Pregnancies-anonymized.csv") %>% select(c("OutcomeGpNumeric",  "AGE",    
+outcomes <- read.csv("BTA-Pregnancies-anonymized.csv") %>% select(c("OutcomeGpNumeric",
+                                                                    "LIGATION_GROUP",
+                                                                    "AGE",    
                                                                     "TUBELENGTH_L_DISTAL",  "TUBELENGTH_R_DISTAL", 
                                                                     "LEFT_TUBE_LENGTH",     "RIGHT_TUBE_LENGTH",
                                                                     "TUBELENGTH_L_PROX",    "TUBELENGTH_R_PROX",  
@@ -33,7 +35,7 @@ outcomes <- read.csv("BTA-Pregnancies-anonymized.csv") %>% select(c("OutcomeGpNu
   filter(AGE > 10) %>%
   na.omit() %>% mutate(LEFT_TUBE_LENGTH = as.numeric(as.character(LEFT_TUBE_LENGTH)) ) %>%
   mutate(TUBELENGTH_L_DISTAL = as.numeric(as.character(TUBELENGTH_L_DISTAL)) ) %>%
-  droplevels()  
+  droplevels()   
 
 
 # Sort left or right for each woman via bernoulli process
@@ -72,12 +74,63 @@ outcomes2 <- outcomes %>%
   mutate(OutcomeGpNumeric = as.factor(OutcomeGpNumeric)) %>%
   mutate(Diam_rand  = Diam_rand) %>%
   select(c("OutcomeGpNumeric",
+#"LIGATION_GROUP",
            "AGE", "TL_rand","ANAS_rand","Fibr_rand",
-           "Diam_rand")) 
+           "Diam_rand")) %>%
+  mutate(Fibr_rand = recode(Fibr_rand, "0" = "None",
+                            "1" = "Mild",
+                            "2" = "Moderate",
+                            "3" = "Severe")) %>%
+  mutate(Fibr_rand = as.factor(Fibr_rand)) %>%
+  mutate(Fibr_rand = factor(Fibr_rand,levels=c("None","Mild","Moderate","Severe"))) %>%
+  mutate(ANAS_rand = recode(ANAS_rand, "0" = "Identical",
+                            "1" = "1-SPD",
+                            "2" = "2-SPD",
+                            "3" = "3-SPD")) %>% 
+  mutate(ANAS_rand = factor(ANAS_rand,levels=c("Identical","1-SPD","2-SPD","3-SPD")))  %>% 
+  mutate(Diam_rand = recode(Diam_rand, "1" = "Similar","2" = "Somewhat dissimilar","3" = "Dissimilar")) %>% 
+  mutate(Diam_rand = factor(Diam_rand,levels=c("Similar","Somewhat dissimilar","Dissimilar"))) 
+
+#colnames(outcomes2) <- c("OutcomeGpNumeric","Sterilization_Method", "Age", "Length","Location","Fibrosis",       
+#                     "Diameter")
+
+colnames(outcomes2) <- c("OutcomeGpNumeric", "Age", "Length","Location","Fibrosis",       
+                     "Diameter")
+
+
+
+gL <- table(outcomes2[,c("Location","OutcomeGpNumeric")])
+colnames(gL) <- c("Birth","Ongoing","Miscarriage","Ectopic")
+
+pdf("mosaic_Loc_out.pdf",height = 6,width = 7) 
+mosaicplot(t(gL),main="",col=c('#fee5d9','#fcae91','#fb6a4a','#cb181d'),xlab="Pregnancy Outcome",ylab="Location",
+           cex = 0.85,border="black",
+           off=5,las=1)
+dev.off()
+
+
+gF <- table(outcomes2[,c("Fibrosis","OutcomeGpNumeric")])
+colnames(gF) <- c("Birth","Ongoing","Miscarriage","Ectopic")
+
+pdf("mosaic_fib_out.pdf",height = 6,width = 7) 
+mosaicplot(t(gF),main="",col=rev(c('#bf9b30','#f1b502','#ffc004','#ffe28a')),xlab="Pregnancy Outcome",ylab="Fibrosis",
+           cex = 0.85,border="black",
+           off=5,las=1)
+dev.off()
+
+gD <- table(outcomes2[,c("Diameter","OutcomeGpNumeric")])
+colnames(gD) <- c("Birth","Ongoing","Miscarriage","Ectopic")
+rownames(gD) <- c("Similar",'~Dissimilar',"Dissimilar")
+
+pdf("mosaic_diam_out.pdf",height = 6,width = 7) 
+mosaicplot(t(gD),main="",col=c('#eff3ff','#bdd7e7','#6baed6','#2171b5'),xlab="Pregnancy Outcome",ylab="Diameter",
+           cex = 0.85,border="black",
+           off=5,las=1)
+dev.off()
 
 
 # Split train vs test sample
-trainIndex <- createDataPartition(outcomes2$OutcomeGpNumeric, p = .7, 
+trainIndex <- createDataPartition(outcomes2$OutcomeGpNumeric, p = .95, 
                                   list = FALSE, 
                                   times = 1)
 Train <- outcomes2[trainIndex,] 
@@ -88,23 +141,39 @@ Test  <- outcomes2[-trainIndex,]
 #%>% mutate(LIGATION_GROUP = as.numeric(LIGATION_GROUP))
 
 
-classif_rf <-  randomForest(OutcomeGpNumeric~ 1+ 
-                              AGE+
-                              TL_rand + 
-                              ANAS_rand + Fibr_rand + Diam_rand, 
-                            data = Train, ntree=2000,nodesize=50)
 
+#### Model comparison 
+
+classif_gam_A <- vgam(OutcomeGpNumeric~
+                        s(Age,bs="cr",k=10)+
+                        Sterilization_Method,multinomial, data = Train)
+
+classif_gam_B <- vgam(OutcomeGpNumeric~
+                        s(Age,bs="cr",k=10)+
+                        s(Length,bs="cr",k=10) + 
+                        Location + Fibrosis + Diameter,multinomial, data = Train)
+
+classif_gam_C <- vgam(OutcomeGpNumeric~
+                        s(Age,bs="cr",k=10)+
+                        Sterilization_Method +
+                        s(Length,bs="cr",k=10) + 
+                        Location + Fibrosis + Diameter,multinomial, data = Train)
+
+
+
+y_true = as.numeric(Train[,1])
+
+LEA <- MultiLogLoss(y_pred = predict(classif_gam_A,type="response"), y_true= y_true)
+LEB <- MultiLogLoss(y_pred = predict(classif_gam_B,type="response"), y_true= y_true)
+LEC <- MultiLogLoss(y_pred = predict(classif_gam_C,type="response"), y_true= y_true)
+####
 
 
 classif_gam <- vgam(OutcomeGpNumeric~
-       s(AGE,bs="cr",k=10)+
-       s(TL_rand,bs="cr",k=10) + 
-       ANAS_rand + Fibr_rand + Diam_rand,multinomial, data = Train)
+       s(Age,bs="cr",k=10)+
+       s(Length,bs="cr",k=10) + 
+         Location + Fibrosis + Diameter,multinomial, data = Train)
 
-
-loss_cross_entropy(Train[,1], yhat(classif_rf))
-
-loss_cross_entropy(Train[,1],  predict(classif_gam,type="response"))
 
 
 
@@ -113,61 +182,27 @@ loss_cross_entropy(Train[,1],  predict(classif_gam,type="response"))
 #3=miscarriage
 #4=ectopic
 
-pred1 <- function(m, x)   predict(m, x, type = "prob")[,1]
-pred2 <- function(m, x)   predict(m, x, type = "prob")[,2]
-pred3 <- function(m, x)   predict(m, x, type = "prob")[,3]
-pred4 <- function(m, x)   predict(m, x, type = "prob")[,4]
-
-
-explain_rf_1 <- explain(classif_rf, data = Test[,-1], 
-                              y = Test$OutcomeGpNumeric == "1", 
-                              predict_function = pred1, label = "Birth")
-explain_rf_2 <- explain(classif_rf, data = Test[,-1], 
-                           y = Test$OutcomeGpNumeric == "2",
-                           predict_function = pred2, label = "Ongoing")
-explain_rf_3 <- explain(classif_rf, data = Test[,-1], 
-                                 y = Test$OutcomeGpNumeric == "3", 
-                                 predict_function = pred3, label = "Miscarriage")
-
-explain_rf_4 <- explain(classif_rf, data = Test[,-1], 
-                          y = Test$OutcomeGpNumeric == "4",
-                          predict_function = pred4, label = "Ectopic")
-
-
-
-
-
-
-
 predgam1 <- function(m, x)   predict(m, x, type = "response")[,1]
 predgam2 <- function(m, x)   predict(m, x, type = "response")[,2]
 predgam3 <- function(m, x)   predict(m, x, type = "response")[,3]
 predgam4 <- function(m, x)   predict(m, x, type = "response")[,4]
 
 
-explain_gam_1 <- explain(classif_gam, data = Test[,-1], 
-                        y = Test$OutcomeGpNumeric == "1", 
+explain_gam_1 <- explain(classif_gam, data = Train[,-1], 
+                        y = Train$OutcomeGpNumeric == "1", 
                         predict_function = predgam1, label = "Birth")
-explain_gam_2 <- explain(classif_gam, data = Test[,-1], 
-                        y = Test$OutcomeGpNumeric == "2",
+explain_gam_2 <- explain(classif_gam, data = Train[,-1], 
+                        y = Train$OutcomeGpNumeric == "2",
                         predict_function = predgam2, label = "Ongoing")
-explain_gam_3 <- explain(classif_gam, data = Test[,-1], 
-                        y = Test$OutcomeGpNumeric == "3", 
+explain_gam_3 <- explain(classif_gam, data = Train[,-1], 
+                        y = Train$OutcomeGpNumeric == "3", 
                         predict_function = predgam3, label = "Miscarriage")
 
-explain_gam_4 <- explain(classif_gam, data = Test[,-1], 
-                        y = Test$OutcomeGpNumeric == "4",
+explain_gam_4 <- explain(classif_gam, data = Train[,-1], 
+                        y = Train$OutcomeGpNumeric == "4",
                         predict_function = predgam4 , label = "Ectopic")
 
 
-
-mp_rf_1 <- model_performance(explain_rf_1) %>% as.data.frame()
-mp_rf_2 <- model_performance(explain_rf_2) %>% as.data.frame()
-mp_rf_3 <- model_performance(explain_rf_3) %>% as.data.frame()
-mp_rf_4 <- model_performance(explain_rf_4) %>% as.data.frame()
-
-mp_rf_all <- rbind(mp_rf_1,mp_rf_2,mp_rf_3,mp_rf_4) %>%
-  mutate(method="RF")
 
 mp_gam_1 <- model_performance(explain_gam_1) %>% as.data.frame()
 mp_gam_2 <- model_performance(explain_gam_2) %>% as.data.frame()
@@ -177,7 +212,7 @@ mp_gam_4 <- model_performance(explain_gam_4) %>% as.data.frame()
 mp_gam_all <- rbind(mp_gam_1,mp_gam_2,mp_gam_3,mp_gam_4) %>%
   mutate(method="GAM")
 
-mp_multi_all <- rbind(mp_rf_all,mp_gam_all) %>% mutate(diff = abs(diff))
+mp_multi_all <- mp_gam_all %>% mutate(diff = abs(diff))
   
 
 
@@ -196,126 +231,114 @@ ggplot(mp_multi_all,aes(x=diff,group=label,
 
 
 # AGE
-ale_rf1_age   <- variable_response(explain_rf_1, variable =  "AGE", type = "ale")
-ale_rf2_age   <- variable_response(explain_rf_2, variable =  "AGE", type = "ale")
-ale_rf3_age   <- variable_response(explain_rf_3, variable =  "AGE", type = "ale")
-ale_rf4_age   <- variable_response(explain_rf_4, variable =  "AGE", type = "ale")
-ale_all_age <- rbind(ale_rf1_age,ale_rf2_age,ale_rf3_age,ale_rf4_age ) %>%
-  mutate(method = "RF")
 
 
-
-ale_gam1_age   <- variable_response(explain_gam_1, variable =  "AGE", type = "ale")
-ale_gam2_age   <- variable_response(explain_gam_2, variable =  "AGE", type = "ale")
-ale_gam3_age   <- variable_response(explain_gam_3, variable =  "AGE", type = "ale")
-ale_gam4_age   <- variable_response(explain_gam_4, variable =  "AGE", type = "ale")
+ale_gam1_age   <- variable_response(explain_gam_1, variable =  "Age", type = "pdp")
+ale_gam2_age   <- variable_response(explain_gam_2, variable =  "Age", type = "pdp")
+ale_gam3_age   <- variable_response(explain_gam_3, variable =  "Age", type = "pdp")
+ale_gam4_age   <- variable_response(explain_gam_4, variable =  "Age", type = "pdp")
 ale_gam_all_age <- rbind(ale_gam1_age,ale_gam2_age,ale_gam3_age,ale_gam4_age ) %>%
   mutate(method = "GAM")
 
 
-ale_all <- rbind(ale_all_age,ale_gam_all_age )
-
-
-pdf("ale_age_outcome.pdf",height = 5,width = 12)
-g <- ggplot(ale_all,aes(x=x,y=y,group=label,color=label,fill=label)) + 
-  geom_smooth(method = 'loess',span=0.25) +
+pdf("ale_age_outcome.pdf",height = 5.5,width = 6.5)
+g <- ggplot(ale_gam_all_age,aes(x=x,y=y,group=label,color=label,fill=label)) + 
+  geom_smooth(method = 'loess',span=0.3) +
   #+ geom_point() +
   my_style() +
   scale_linetype_stata(name="") +
   scale_color_wsj(name="") + ylab("Outcome likelihood") +
   scale_fill_wsj(name = "") +
-  xlab("AGE (yr)") +
-#+ 
-#  coord_cartesian(xlim=c(21,50),ylim=c(0,0.8)) +
-  facet_wrap(.~method)
+  coord_cartesian(xlim=c(20,50),ylim=c(0.1,0.7)) + 
+  xlab("Age (yr)") 
 direct.label(g,"angled.endpoints")
 dev.off()
 
 
-pdf("ale_age_outcome.pdf",height = 4,width = 6)
-g <- ggplot(ale_all_age,aes(x=x,y=y,group=label,color=label,fill=label)) + 
-  geom_smooth(method = 'loess',span=0.25) +
-#+ geom_point() +
-  my_style() +
-  scale_linetype_stata(name="") +
-  scale_color_wsj(name="") + ylab("Outcome likelihood") +
-  scale_fill_wsj(name = "") +
-  xlab("AGE (yr)") + 
-  coord_cartesian(xlim=c(21,50),ylim=c(0,1))
-direct.label(g,"angled.endpoints")
-#+
-#  theme(legend.position = "none" )
-dev.off()
-
-
-
-gg <- ggplot(ale_gam_all_age,aes(x=x,y=y,group=label,color=label,fill=label)) + 
-  geom_smooth(method = 'loess',span=0.25) +
-  #+ geom_point() +
-  my_style() +
-  scale_linetype_stata(name="") +
-  scale_color_wsj(name="") + ylab("Outcome likelihood") +
-  scale_fill_wsj(name = "") +
-  xlab("AGE (yr)") + 
-  coord_cartesian(xlim=c(21,50),ylim=c(0,1))
-direct.label(gg,"angled.endpoints")
 
 
 
 
 ## Tube lenght properties
 
-ale_rf1_TL1   <- variable_response(explain_rf_1, variable =  "TL_rand", type = "pdp")
-ale_rf2_TL1   <- variable_response(explain_rf_2, variable =  "TL_rand", type = "pdp")
-ale_rf3_TL1   <- variable_response(explain_rf_3, variable =  "TL_rand", type = "pdp")
-ale_rf4_TL1   <- variable_response(explain_rf_4, variable =  "TL_rand", type = "pdp")
-
-
-ale_rf1_TLD1   <- variable_response(explain_rf_1, variable =  "TLD_rand", type = "pdp")
-ale_rf2_TLD1   <- variable_response(explain_rf_2, variable =  "TLD_rand", type = "pdp")
-ale_rf3_TLD1   <- variable_response(explain_rf_3, variable =  "TLD_rand", type = "pdp")
-ale_rf4_TLD1   <- variable_response(explain_rf_4, variable =  "TLD_rand", type = "pdp")
-
-
-ale_rf1_TLP1   <- variable_response(explain_rf_1, variable =  "TLP_rand", type = "pdp")
-ale_rf2_TLP1   <- variable_response(explain_rf_2, variable =  "TLP_rand", type = "pdp")
-ale_rf3_TLP1   <- variable_response(explain_rf_3, variable =  "TLP_rand", type = "pdp")
-ale_rf4_TLP1   <- variable_response(explain_rf_4, variable =  "TLP_rand", type = "pdp")
-
-ale_TL_all <- rbind(ale_rf1_TL1,ale_rf2_TL1,ale_rf3_TL1,ale_rf4_TL1,
-                    ale_rf1_TLD1,ale_rf2_TLD1,ale_rf3_TLD1,ale_rf4_TLD1,
-                    ale_rf1_TLP1,ale_rf2_TLP1,ale_rf3_TLP1,ale_rf4_TLP1) %>%
-  mutate(var = recode(var, TL_rand = "Tube length",
-                      TLD_rand = "Tube length distal",
-                      TLP_rand = "Tube length prox"))
+ale_gam1_Length   <- variable_response(explain_gam_1, variable =  "Length", type = "pdp")
+ale_gam2_Length   <- variable_response(explain_gam_2, variable =  "Length", type = "pdp")
+ale_gam3_Length   <- variable_response(explain_gam_3, variable =  "Length", type = "pdp")
+ale_gam4_Length   <- variable_response(explain_gam_4, variable =  "Length", type = "pdp")
+ale_gam_all_Length <- rbind(ale_gam1_Length,ale_gam2_Length,ale_gam3_Length,ale_gam4_Length ) 
 
 
 
 
-pdf("ale_TL_multi.pdf",height = 4.5,width = 14)
-g2 <- ggplot(ale_TL_all,aes(x=x,y=y,group=label,color=label,fill=label)) +
-  geom_smooth(method = 'loess',span=0.275) + 
+
+
+pdf("ale_TL_outcome.pdf",height = 5.5,width = 6.5)
+g2 <- ggplot(ale_gam_all_Length,aes(x=x,y=y,group=label,color=label,fill=label)) +
+  geom_smooth(method = 'loess',span=0.3) + 
  # geom_point() +  
   my_style() +
   scale_linetype_stata(name="") +
   scale_color_wsj(name="") + ylab("Outcome likelihood") +
   scale_fill_wsj(name = "") + 
   ylab("Outcome likelihood") + xlab("Length (cm)") +
-  coord_cartesian(xlim=c(-0.675,12)) + facet_wrap(.~var) 
+  coord_cartesian(xlim=c(0.5,10))  
 direct.label(g2,"lasso.labels")
 dev.off()
 
 
+# AGE
 
 
-explain_rf <- explain(classif_rf, label = "RF",
-                      data = Test[,-1], y = yTest,
-                      predict_function = p_rf)
+ale_gam1_fib   <- variable_response(explain_gam_1, variable =  "Fibrosis", type = "factor")
+ale_gam2_fib   <- variable_response(explain_gam_2, variable =  "Fibrosis", type = "factor")
+ale_gam3_fib   <- variable_response(explain_gam_3, variable =  "Fibrosis", type = "factor")
+ale_gam4_fib   <- variable_response(explain_gam_4, variable =  "Fibrosis", type = "factor")
+ale_gam_all_fib <- rbind(ale_gam1_fib,ale_gam2_fib,ale_gam3_fib,ale_gam4_fib ) %>%
+  mutate(method = "GAM")
 
 
 
 
 
+
+loss_entropy <- function(y, p){
+  y <- as.numeric(y)
+  -(1/length(y))*sum((y*log(p) + (1-y)*log(1-p))
+  )
+}
+
+y_true = 
+classif_gam$fitted.values
+
+
+
+LS1 <- function(y,p){
+  p <-  predict(classif_gam,type = "response")[,1]
+  y <- as.numeric(Train[,1])
+  y_pred <- p
+  y_true <- y
+  MultiLogLoss(y_pred, y_true)
+}
+
+vi_gam <- variable_importance(explain_gam_1,
+                              n_sample = -1,loss_function = loss_entropy,
+                              type = "difference")
+
+vi_gam1 <- variable_importance(explain_gam_1,
+                              n_sample = -1,loss_function = loss_entropy,
+                              type = "difference")
+vi_gam2 <- variable_importance(explain_gam_2,
+                               n_sample = -1,loss_function = loss_entropy,
+                               type = "difference")
+vi_gam3 <- variable_importance(explain_gam_3,
+                               n_sample = -1,loss_function = loss_entropy,
+                               type = "difference")
+vi_gam4 <- variable_importance(explain_gam_4,loss_function = loss_entropy,
+                               n_sample = -1,
+                               type = "difference")
+pdf("vir_outcome.pdf",height = 10,width = 7.5)
+plot(vi_gam1,vi_gam2,vi_gam3,vi_gam4)
+dev.off()
 
 ale_rf_age   <- variable_response(explain_rf, variable =  "AGE", type = "pdp")
 

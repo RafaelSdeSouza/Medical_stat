@@ -21,6 +21,7 @@ source("my_style.R")
 require(ggthemes)
 require(kernlab)
 require(forcats)
+require(ggpubr)
 # Auxiliar function to randomly select a given column 
 
 
@@ -42,6 +43,8 @@ preg <- read.csv("BTA-Patients-MAW.csv") %>% select(c("PREGNANT_NUMERIC",  "AGE"
    filter(PREGNANT_NUMERIC %in% c(0,1)) %>% 
    mutate(PREGNANT_NUMERIC = as.numeric(as.character(PREGNANT_NUMERIC))) %>% 
    droplevels()  
+
+
 
 
 # Population summary
@@ -71,12 +74,14 @@ PyrAN <-  preg[,c("ANASTOMOSIS2_NUMERIC","ANASTOMOSIS1_NUMERIC")]  %>%
 
   mutate(class = "Anastomosis") 
 
+
+
 #pdf("Anastomosis.pdf",height = 5.5,width = 6.5)
 gana <- ggplot(PyrAN, aes(x = value, y =  100*(..count..)/sum(..count..), fill = variable,alpha=variable)) +   # Fill column
   geom_bar(position = "dodge",fill="#c72e29")   +  my_style() +
   scale_alpha_manual(values=c(0.6,1)) +
   scale_fill_wsj(name = "") + 
-  xlab("Anastomosis") +
+  xlab("Location") +
   ylab("") + 
   theme(legend.spacing.x = unit(0.15, 'cm'),legend.position = "none") 
 #dev.off()
@@ -131,7 +136,7 @@ gfib <- ggplot(PyrFib, aes(x = value, y =  100*(..count..)/sum(..count..), fill 
 PyrTL <-  preg[,c("LEFT_TUBE_LENGTH","RIGHT_TUBE_LENGTH")]  %>%
   melt() %>%  mutate(variable = recode(variable, LEFT_TUBE_LENGTH = "Left",
                                        RIGHT_TUBE_LENGTH = "Right"))  %>% 
-  mutate(class = "Tube length (cm)") %>% 
+  mutate(class = "Length (cm)") %>% 
   mutate(variable = factor(variable,levels=c("Left","Right"))) 
 
 
@@ -143,7 +148,7 @@ gTL <- ggplot(data= PyrTL,aes(x=value, alpha=variable,group=variable)) +
   geom_histogram(position='dodge',fill="#098154",binwidth = 0.5,aes(group=variable,y = 100*(..count..)/sum(..count..)))  +  my_style() +
   scale_fill_wsj(name = "") +
   scale_alpha_manual(values=c(0.6,1)) +
-  xlab("Tube lenght (cm)") + theme(legend.position = "none") + ylab("") 
+  xlab("Length (cm)") + theme(legend.position = "none") + ylab("") 
 
 
 pdf("anatomy.pdf",height = 9.5,width = 11)
