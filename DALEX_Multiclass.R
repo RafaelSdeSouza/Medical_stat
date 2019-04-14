@@ -16,6 +16,7 @@ source("my_style.R")
 require(ggthemes)
 require(kernlab)
 require(forcats)
+require(VGAM)
 # Auxiliar function to randomly select a given column 
 
 
@@ -241,6 +242,9 @@ ale_gam_all_age <- rbind(ale_gam1_age,ale_gam2_age,ale_gam3_age,ale_gam4_age ) %
   mutate(method = "GAM")
 
 
+
+ale_gam1_age
+
 pdf("ale_age_outcome.pdf",height = 5.5,width = 6.5)
 g <- ggplot(ale_gam_all_age,aes(x=x,y=y,group=label,color=label,fill=label)) + 
   geom_smooth(method = 'loess',span=0.3) +
@@ -338,6 +342,14 @@ vi_gam4 <- variable_importance(explain_gam_4,loss_function = loss_entropy,
                                type = "difference")
 pdf("vir_outcome.pdf",height = 10,width = 7.5)
 plot(vi_gam1,vi_gam2,vi_gam3,vi_gam4)
+dev.off()
+
+pdf("vir_outcome1.pdf",height = 5,width = 6)
+plot(vi_gam1,vi_gam3)
+dev.off()
+
+pdf("vir_outcome2.pdf",height = 5,width = 6)
+plot(vi_gam2,vi_gam4)
 dev.off()
 
 ale_rf_age   <- variable_response(explain_rf, variable =  "AGE", type = "pdp")
