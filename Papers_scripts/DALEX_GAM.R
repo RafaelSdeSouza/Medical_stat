@@ -263,13 +263,13 @@ dev.off()
 
 
 p_gam  <- function(object, newdata){predict(object, newdata=newdata, type="response")}
-yTest <- as.numeric(as.character(Test$PREGNANT_NUMERIC))
+yTest <- as.numeric(as.character(Train$PREGNANT_NUMERIC))
 
 
 
 
-explain_gam  <- explain(classif_gam, label = "GAM", 
-                                        data = Test[,-1], y = yTest,
+explain_gam  <- explain(classif_gam, label = "Pregnancy", 
+                                        data = Train[,-1], y = yTest,
                                  predict_function = p_gam)
 
 
@@ -356,8 +356,8 @@ plot.roc(yTest,pred_rf,
 
 vi_gam <- variable_importance(explain_gam,  n_sample = -1,loss_function = loss_entropy,type = "difference")
 
-pdf("VIR_PregnancyLik.pdf",height = 4.5,width = 5.5)
-plot(vi_gam,bar_width = 4)
+pdf("VIR_PregnancyLik.pdf",height = 3.5,width = 4)
+plot(vi_gam)
 dev.off()
 
 
