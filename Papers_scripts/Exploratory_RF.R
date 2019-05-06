@@ -45,6 +45,7 @@ preg <- read.csv("BTA-Patients-MAW.csv") %>% select(c("PREGNANT_NUMERIC",  "AGE"
    droplevels()  
 
 
+write.csv(preg,"Pregnancy.csv",row.names = F)
 
 
 # Population summary

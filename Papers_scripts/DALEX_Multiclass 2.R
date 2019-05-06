@@ -98,6 +98,12 @@ outcomes2 <- outcomes %>%
 colnames(outcomes2) <- c("OutcomeGpNumeric", "Age", "Length","Location","Fibrosis",       
                      "Diameter")
 
+outcomes3 <- outcomes2 %>% 
+mutate(OutcomeGpNumeric = recode(OutcomeGpNumeric,
+"1"="Birth","2"="Ongoing","3" = "Miscarriage",
+"4" = "Ectopic"))
+
+write.csv(outcomes3,"Outcomes.csv",row.names = F)
 
 
 gL <- table(outcomes2[,c("Location","OutcomeGpNumeric")])
