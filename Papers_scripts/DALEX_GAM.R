@@ -103,8 +103,14 @@ preg2 <- preg %>%
  colnames(preg2) <- c("PREGNANT_NUMERIC", "Age", "Length","Location","Fibrosis",       
                    "Diameter")
 
+
+ 
  write.csv(preg2,"Pregnancy.csv",row.names = F)
 
+ 
+ 
+ 
+ 
 
 ga <- table(preg2[,c("Location","PREGNANT_NUMERIC")])
 colnames(ga) <- c("No","Yes")
