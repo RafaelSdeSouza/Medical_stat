@@ -75,7 +75,7 @@ outcomes2 <- outcomes %>%
   mutate(OutcomeGpNumeric = as.factor(OutcomeGpNumeric)) %>%
   mutate(Diam_rand  = Diam_rand) %>%
   dplyr::select(c("OutcomeGpNumeric",
-                  #"LIGATION_GROUP",
+                  "LIGATION_GROUP",
                   "AGE", "TL_rand","ANAS_rand","Fibr_rand",
                   "Diam_rand")) %>%
   mutate(Fibr_rand = recode(Fibr_rand, "0" = "None",
@@ -92,11 +92,11 @@ outcomes2 <- outcomes %>%
   mutate(Diam_rand = recode(Diam_rand, "1" = "Similar","2" = "Somewhat dissimilar","3" = "Dissimilar")) %>%
   mutate(Diam_rand = factor(Diam_rand,levels=c("Similar","Somewhat dissimilar","Dissimilar")))
 
-#colnames(outcomes2) <- c("OutcomeGpNumeric","Sterilization_Method", "Age", "Length","Location","Fibrosis",
-#                     "Diameter")
+colnames(outcomes2) <- c("OutcomeGpNumeric","Sterilization_Method", "Age", "Length","Location","Fibrosis",
+                     "Diameter")
 
-colnames(outcomes2) <- c("OutcomeGpNumeric", "Age", "Length","Location","Fibrosis",
-                         "Diameter")
+#colnames(outcomes2) <- c("OutcomeGpNumeric", "Age", "Length","Location","Fibrosis",
+#                         "Diameter")
 
 outcomes3 <- outcomes2 %>%
   mutate(OutcomeGpNumeric = recode(OutcomeGpNumeric,

@@ -18,10 +18,12 @@ require(kernlab)
 require(forcats)
 require(VGAM)
 
-Train0 <- read.csv("Outcomes.csv") %>%
- mutate(OutcomeGpNumeric = recode(OutcomeGpNumeric,Ectopic = "Miscarriage")) %>%
-  filter(OutcomeGpNumeric != "Ongoing") %>% mutate(OutcomeGpNumeric=
-                                                     droplevels(OutcomeGpNumeric))
+Train0 <- read.csv("Outcomes.csv")
+#%>%
+# mutate(OutcomeGpNumeric = recode(OutcomeGpNumeric,Ectopic = "Miscarriage")) %>%
+#  filter(OutcomeGpNumeric != "Ongoing") %>% mutate(OutcomeGpNumeric=
+ #droplevels(OutcomeGpNumeric))
+
 # Split train vs test sample
 trainIndex <- createDataPartition(Train0$OutcomeGpNumeric, p = .75,
                                   list = FALSE,
@@ -36,6 +38,10 @@ fitControl <- trainControl(## 10-fold CV
   number = 5,
   ## Estimate class probabilities
   repeats = 1)
+
+
+
+
 
 
 #### Model comparison 
@@ -55,77 +61,43 @@ classif_gam_C <- vgam(OutcomeGpNumeric~
                         s(Length,bs="cr",k=10) + 
                         Location + Fibrosis + Diameter,multinomial, data = Train)
 
+#### Model comparison
+pred_A <- predict(classif_gam_A ,newdata=Test[,-1], type = "response")
+pclass_A <- max.col(pred_A) %>% as.factor()
+pclass_A <- recode(pclass_A, "1" = "Birth","2" = "Ectopic","3"="Miscarriage","4" = "Ongoing")
+table(pclass_A,Test[,1])
+
+
+pred_B <- predict(classif_gam_B ,newdata=Test[,-1], type = "response")
+pclass_B <- max.col(pred_B) %>% as.factor()
+pclass_B <- recode(pclass_B, "1" = "Birth","2" = "Ectopic","3"="Miscarriage","4" = "Ongoing")
+table(pclass_B,Test[,1])
+
+
+pred_C <- predict(classif_gam_C ,newdata=Test[,-1], type = "response")
+pclass_C <- max.col(pred_C) %>% as.factor()
+pclass_C <- recode(pclass_C, "1" = "Birth","2" = "Ectopic","3"="Miscarriage","4" = "Ongoing")
+table(pclass_C,Test[,1])
 
 
 
-Fit <- train(OutcomeGpNumeric ~ ., data = Train, 
-               method = "xgbTree",trControl = fitControl,
-               metric='Accuracy')
-
-
-pred <- predict(rfFit,newdata=Test[,-1], type = "raw")
-table(pred,Test[,1])
-
-confusionMatrix(pred,
+confusionMatrix(pclass_C,
                 Test[,1],
                 mode = "everything")
 
 
 
-classif_gam <- vgam(OutcomeGpNumeric~
-                      s(Age,bs="cr",k=10)+
-                      s(Length,bs="cr",k=10) +
-                      Location + Fibrosis + Diameter,multinomial, data = Train)
-
-
-
-
-
-
-#### Model comparison
-
-classif_gam_A <- vgam(OutcomeGpNumeric~
-                        s(Age,bs="cr",k=10)+
-                        Sterilization_Method,multinomial, data = Train)
-
-classif_gam_B <- vgam(OutcomeGpNumeric~
-                        s(Age,bs="cr",k=10)+
-                        s(Length,bs="cr",k=10) +
-                        Location + Fibrosis + Diameter,multinomial, data = Train)
-
-classif_gam_C <- vgam(OutcomeGpNumeric~
-                        s(Age,bs="cr",k=10)+
-                        Sterilization_Method +
-                        s(Length,bs="cr",k=10) +
-                        Location + Fibrosis + Diameter,multinomial, data = Train)
 
 
 
 y_true = as.numeric(Train[,1])
 
-LEA <- MultiLogLoss(y_pred = predict(classif_gam_A,type="response"), y_true= y_true)
-LEB <- MultiLogLoss(y_pred = predict(classif_gam_B,type="response"), y_true= y_true)
-LEC <- MultiLogLoss(y_pred = predict(classif_gam_C,type="response"), y_true= y_true)
+LEA <- MLmetrics::MultiLogLoss(y_pred = predict(classif_gam_A,type="response"), y_true= y_true)
+LEB <- MLmetrics::MultiLogLoss(y_pred = predict(classif_gam_B,type="response"), y_true= y_true)
+LEC <- MLmetrics::MultiLogLoss(y_pred = predict(classif_gam_C,type="response"), y_true= y_true)
 ####
 
 
-classif_gam <- vgam(OutcomeGpNumeric~
-       s(Age,bs="cr",k=10)+
-       s(Length,bs="cr",k=10) +
-         Location + Fibrosis + Diameter,multinomial, data = Train)
-
-
-
-pred <- predict(classif_gam,newdata=Test[,-1], type = "response")
-pclass <- max.col(pred) %>% as.factor()
-pclass <- recode(pclass, "1" = "Birth","2" = "Ongoing","3"="Miscarriage","4" = "Ectopic")
-
-table(pclass,Test[,1])
-
-
-confusionMatrix(pclass,
-                Test[,1],
-                mode = "everything")
 #1=birth
 #2=ongoing
 #3=miscarriage
@@ -232,10 +204,11 @@ loss_entropy <- function(y, p){
   )
 }
 
-y_true =
-classif_gam$fitted.values
+#y_true = classif_gam$fitted.values
 
 
+
+logit <- function(x) exp(x)/(1+exp(x))
 
 LS1 <- function(y,p){
   p <-  predict(classif_gam,type = "response")[,1]
@@ -246,21 +219,17 @@ LS1 <- function(y,p){
 }
 
 vi_gam <- variable_importance(explain_gam_1,
-                              n_sample = -1,loss_function = loss_entropy,
-                              type = "difference")
+                              type = "raw")
 
-vi_gam1 <- variable_importance(explain_gam_1,
-                              n_sample = -1,loss_function = loss_entropy,
-                              type = "difference")
-vi_gam2 <- variable_importance(explain_gam_2,
-                               n_sample = -1,loss_function = loss_entropy,
-                               type = "difference")
-vi_gam3 <- variable_importance(explain_gam_3,
-                               n_sample = -1,loss_function = loss_entropy,
-                               type = "difference")
-vi_gam4 <- variable_importance(explain_gam_4,loss_function = loss_entropy,
-                               n_sample = -1,
-                               type = "difference")
+vi_gam1 <- variable_importance(explain_gam_1,type = "raw",loss_function = function(observed, predicted)
+  sum((observed - logit(predicted))^2))
+vi_gam2 <- variable_importance(explain_gam_2,type = "raw",loss_function = function(observed, predicted)
+  sum((observed - logit(predicted))^2))
+vi_gam3 <- variable_importance(explain_gam_3,type = "raw",loss_function = function(observed, predicted)
+  sum((observed - logit(predicted))^2))
+vi_gam4 <- variable_importance(explain_gam_4,type = "raw",
+                               loss_function = function(observed, predicted)
+                                 sum((observed - logit(predicted))^2))
 
 
 
